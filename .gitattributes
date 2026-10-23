@@ -1,0 +1,20 @@
+* text=auto
+*.js text eol=lf
+*.cjs text eol=lf
+*.mjs text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.cs text eol=lf
+*.ps1 text eol=lf
+*.nsh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+*.exe binary
+*.ico binary
+*.png binary
+LICENSE text eol=lf
+NOTICE text eol=lf

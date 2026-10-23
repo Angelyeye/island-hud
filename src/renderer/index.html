@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; object-src 'none'">
+<title>Island HUD</title>
+<link rel="stylesheet" href="island.css" />
+</head>
+<body>
+  <div id="stage">
+    <div id="notch" class="s-compact" role="region" aria-label="Island HUD">
+      <div class="layer" data-layer="compact"></div>
+      <div class="layer" data-layer="overview"></div>
+      <div class="layer" data-layer="approval"></div>
+      <div class="layer" data-layer="ask"></div>
+      <div class="layer" data-layer="jump"></div>
+      <div class="layer" data-layer="all"></div>
+      <div class="layer" data-layer="approved"></div>
+    </div>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="presentation.js"></script>
+  <script src="question-drafts.js"></script>
+  <script src="native-requests.js"></script>
+  <script src="island.js"></script>
+</body>
+</html>

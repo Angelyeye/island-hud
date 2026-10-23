@@ -1,0 +1,66 @@
+# NOTICE
+
+Island HUD
+Copyright (C) 2026 Angelyeye
+
+本项目以 GNU Affero General Public License v3.0（AGPL-3.0-only）发布。完整条款见仓库根目录的 LICENSE 文件。
+
+## 第三方组件
+
+本项目在构建或运行时使用以下第三方组件，它们分别遵循各自的许可证：
+
+| 组件 | 版本 | 许可证 | 用途 |
+| --- | --- | --- | --- |
+| Electron | 33.4.11 | MIT | 桌面应用运行时 |
+| electron-builder | 26.15.3 | MIT | Windows 打包与安装器 |
+| fzstd | 0.1.1 | MIT | zstd 数据解压 |
+| resedit | 3.1.0 | MIT | 可执行文件资源编辑 |
+| ajv | 8.17.1 | MIT | 配置结构校验 |
+| @deepseek-ai/dsh-web-app（presets/standard.patch.yml，修改版） | 0.2.1-rc.2 | MIT | DSH 标准 preset：timed 问答模式所需配置 |
+
+各组件版权归其原作者所有。打包发布时请保留依赖包内的许可证文件。
+
+## DeepSeek DSH preset 许可
+
+`integrations/dsh/preset-standard.patch.yml` 基于 `@deepseek-ai/dsh-web-app` 的
+`presets/standard.patch.yml` 修改而来（移除了外层 `- insert:` 包装，
+`acceptance criteria` 改为 `success criteria`，并为 `tool-ask-user` 增加
+`mode: timed` / `timeout: 120`）。该文件的版权与许可声明同时保留在其文件头。
+
+```
+MIT License
+
+Copyright (c) 2026 DeepSeek
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## C# 管道助手
+
+`src/tools/pipe-host.exe` 由仓库中的 C# 源码编译生成：
+
+- 源码：`tools/pipe-host.cs`
+- 构建脚本：`tools/build-helpers.cjs`（调用系统 .NET Framework 4 C# 编译器）
+- 重新构建：`npm run build:helpers`
+
+该助手只使用 .NET Framework 自带类型，不引入第三方运行时依赖。
+
+## 独立实现声明
+
+Island HUD 的应用代码为独立实现，未包含、复制或再分发任何第三方产品的图像、图标、字体、音效或界面素材。`integrations/dsh/preset-standard.patch.yml` 是 MIT 许可官方 preset 的修改版，其版权与许可声明已随文件头及本 NOTICE 一并保留。与外部客户端之间的互通仅限于公开或已获授权的扩展点与本地数据格式。

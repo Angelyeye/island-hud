@@ -1,0 +1,3 @@
+- insert:
+    - id: island-hud-native-bridge
+      name: '@island-hud/dsh-bridge'

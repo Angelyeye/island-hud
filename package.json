@@ -1,0 +1,45 @@
+{
+  "name": "island-hud",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Windows top-of-screen island HUD for DeepSeek Harness (DSH).",
+  "license": "AGPL-3.0-only",
+  "author": "Angelyeye",
+  "main": "src/main.js",
+  "type": "commonjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Angelyeye/island-hud.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Angelyeye/island-hud/issues"
+  },
+  "homepage": "https://github.com/Angelyeye/island-hud#readme",
+  "engines": {
+    "node": ">=24"
+  },
+  "os": [
+    "win32"
+  ],
+  "scripts": {
+    "start": "node tools/run-application.cjs",
+    "dev": "node tools/run-application.cjs",
+    "build:helpers": "node tools/build-helpers.cjs",
+    "build:integrations": "node tools/build-integrations.cjs",
+    "test": "node --test --test-concurrency=1 test/*.test.cjs",
+    "test:ui": "node tools/run-ui-tests.cjs",
+    "test:tray": "node tools/run-tray-menu-tests.cjs",
+    "test:all": "npm test && npm run test:ui && npm run test:tray",
+    "test:dsh": "node --test --test-concurrency=1 test/dsh-adapter.test.cjs test/dsh-manager.test.cjs test/dsh-navigation.test.cjs test/logs-and-state.test.cjs test/session-store.test.cjs test/settings.test.cjs test/question-drafts.test.cjs",
+    "package:dsh": "node tools/package-dsh.cjs"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "26.15.3",
+    "resedit": "3.1.0",
+    "ajv": "8.17.1"
+  },
+  "dependencies": {
+    "fzstd": "0.1.1"
+  }
+}

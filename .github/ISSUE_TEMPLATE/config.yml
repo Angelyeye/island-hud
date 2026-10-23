@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞上报
+    url: https://github.com/Angelyeye/island-hud/security/policy
+    about: 请勿公开提交安全问题，请按安全策略私下上报。
+  - name: 使用与安装说明
+    url: https://github.com/Angelyeye/island-hud#readme
+    about: 安装、插件配置与快捷键说明都在 README 中。

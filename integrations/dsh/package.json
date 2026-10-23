@@ -1,0 +1,36 @@
+{
+  "name": "@island-hud/dsh-bridge",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./client": "./lib/navigation-client.js",
+    "./package.json": "./package.json"
+  },
+  "description": "Island HUD native DSH approval, question and session bridge",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-workspace"
+      ]
+    }
+  },
+  "files": [
+    "index.mjs",
+    "cordis.patch.yml",
+    "lib/navigation-client.js"
+  ],
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.5"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  }
+}

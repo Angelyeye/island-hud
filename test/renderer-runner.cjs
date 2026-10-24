@@ -24,7 +24,7 @@ ipcMain.handle('island:session:hide', (_event, id, mode) => {
   if (!session) return { ok: false, reason: 'unknown' };
   if (!['idle', 'completed'].includes(session.phase) || (session.pendingRequests || []).length) return { ok: false, reason: 'active' };
   hidden.add(id + ':' + mode); list = list.filter(item => item.id !== id);
-  if (win && !win.isDestroyed()) win.webContents.send('dsh:update', list);
+  if (win && !win.isDestroyed()) win.webContents.send('island:sessions', list);
   return { ok: true, session: { id, title: session.title } };
 });
 ipcMain.on('island:bounds', () => {}); ipcMain.on('island:interactive', () => {});
@@ -41,10 +41,10 @@ app.whenReady().then(async () => {
     await win.loadFile(path.resolve(__dirname, '../src/renderer/index.html'));
     await until(() => js('window.__islandApp?.getState().syncingSessions === true'));
     await js('window.__islandApp.openOverview()');
-    assert.match(await js('document.querySelector("[data-layer=overview]").textContent'), /正在同步 DSH 会话/);
+    assert.match(await js('document.querySelector("[data-layer=overview]").textContent'), /正在同步会话/);
     checks.push('a fresh host connection reports session synchronization instead of a misleading empty list');
     list = sessions;
-    win.webContents.send('dsh:update', list);
+    win.webContents.send('island:sessions', list);
     await until(() => js('window.__islandApp?.getSessions().length === 13'));
     win.showInactive();
     await js('window.__islandApp.openOverview();document.querySelector("[data-act=overview-more]").click()');
@@ -99,12 +99,12 @@ app.whenReady().then(async () => {
     assert.ok(wrapped.content <= wrapped.box + 1, JSON.stringify(wrapped));
     checks.push('long failure text and unbroken identifiers wrap without horizontal or vertical window clipping');
     await js('window.__islandApp.openOverview();document.querySelector("[data-act=overview-more]").click()');
-    list = list.slice(0, 7); win.webContents.send('dsh:update', list);
+    list = list.slice(0, 7); win.webContents.send('island:sessions', list);
     await until(() => js('window.__islandApp.getSessions().length === 7'));
     assert.match(await js('document.querySelector(".all-count").textContent'), /7/);
     assert.equal(await js('document.querySelectorAll(".all-row").length'), 7);
     checks.push('a shrinking list keeps every remaining session reachable in the scroll list');
-    list[0].phase = 'waitingForApproval'; win.webContents.send('dsh:update', list);
+    list[0].phase = 'waitingForApproval'; win.webContents.send('island:sessions', list);
     await until(() => js('window.__islandApp.getSessions()[0].phase === "waitingForApproval"'));
     assert.equal(await js('document.querySelector("[data-layer=approval] [data-act=allow]") === null'), true);
     checks.push('an approval recovered only from logs has no actionable approval button');
@@ -119,7 +119,7 @@ app.whenReady().then(async () => {
       { id: JSON.stringify(['dsh', 'HIDE-DONE']), rawId: 'HIDE-DONE', provider: 'dsh', project: '隐藏项目', title: '已完成的会话', phase: 'completed', updatedAt: Date.now(), currentTool: null },
       { id: JSON.stringify(['dsh', 'HIDE-IDLE']), rawId: 'HIDE-IDLE', provider: 'dsh', project: '隐藏项目', title: '空闲的会话', phase: 'idle', updatedAt: Date.now(), currentTool: null },
     ];
-    win.webContents.send('dsh:update', list);
+    win.webContents.send('island:sessions', list);
     await until(() => js('window.__islandApp.getSessions().length === 3'));
     await js('window.__islandApp.openOverview()'); await pause(80);
     const heroArchive = '.session-header .archive-button';

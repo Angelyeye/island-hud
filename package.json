@@ -26,6 +26,7 @@
     "dev": "node tools/run-application.cjs",
     "build:helpers": "node tools/build-helpers.cjs",
     "build:integrations": "node tools/build-integrations.cjs",
+    "build:icon": "node design/logo/export-icons.cjs && node tools/make-icon.cjs",
     "test": "node --test --test-concurrency=1 test/*.test.cjs",
     "test:ui": "node tools/run-ui-tests.cjs",
     "test:tray": "node tools/run-tray-menu-tests.cjs",

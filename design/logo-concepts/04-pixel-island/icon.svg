@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Island HUD — Pixel Island</title>
+  <desc id="desc">An orange pixel-built island with an activity wave and a blue status pixel, evolving the original icon.</desc>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="#181818"/>
+  <rect x="34" y="34" width="956" height="956" rx="218" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="4"/>
+  <g shape-rendering="crispEdges">
+    <rect x="480" y="192" width="64" height="64" fill="#83AAFF"/>
+    <g fill="#FF7A1A">
+      <rect x="352" y="288" width="320" height="64"/>
+      <rect x="288" y="352" width="448" height="64"/>
+      <rect x="224" y="416" width="576" height="128"/>
+      <rect x="288" y="544" width="448" height="64"/>
+      <rect x="352" y="608" width="320" height="64"/>
+    </g>
+    <g fill="#181818">
+      <rect x="352" y="416" width="64" height="128"/>
+      <rect x="480" y="352" width="64" height="192"/>
+      <rect x="608" y="416" width="64" height="128"/>
+    </g>
+  </g>
+</svg>

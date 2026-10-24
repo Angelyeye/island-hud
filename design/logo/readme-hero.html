@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Island HUD — README hero</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:1600px;height:760px;overflow:hidden;font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;background:#0b0f18;color:#f4f7fc}
+  body{position:relative;background:radial-gradient(circle at 10% 0%,#5b8cff20,transparent 37%),radial-gradient(circle at 88% 78%,#5b8cff16,transparent 35%),linear-gradient(135deg,#101624,#0b101a 64%,#101724)}
+  body:before{content:"";position:absolute;inset:0;background-image:linear-gradient(#a9c7ff08 1px,transparent 1px),linear-gradient(90deg,#a9c7ff08 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(90deg,#000,transparent 76%)}
+  .frame{position:absolute;inset:0;border:1px solid #a9c7ff24;border-radius:34px;overflow:hidden}
+  .layout{position:relative;height:100%;padding:72px 88px 62px;display:grid;grid-template-columns:720px 1fr;gap:62px;align-items:center}
+  .identity{display:flex;align-items:center;gap:22px;margin-bottom:36px}.identity img{width:84px;height:84px;filter:drop-shadow(0 12px 18px #0006)}
+  .eyebrow{font-size:20px;font-weight:650;letter-spacing:1.5px;color:#c4d2e7}.subeyebrow{margin-top:8px;font-size:14px;letter-spacing:1.8px;color:#718099}
+  h1{font-size:92px;line-height:1;margin:0 0 22px;letter-spacing:-4px;font-weight:750}h1 span{color:#5b8cff}
+  .pixel-rule{display:flex;gap:8px;height:8px;margin-bottom:38px}.pixel-rule i{display:block;height:8px;border-radius:2px;background:#5b8cff;width:116px}.pixel-rule i:nth-child(2){width:48px;background:#a9c7ff}.pixel-rule i:nth-child(3){width:16px;background:#ff8a42}
+  .tagline{font-size:36px;font-weight:650;letter-spacing:.5px;margin:0 0 22px;color:#edf3fb}.desc{font-size:23px;line-height:1.75;color:#9baac0;margin:0}
+  .chips{display:flex;gap:12px;margin-top:30px}.chip{padding:11px 18px;border:1px solid #354052;background:#141a26cc;border-radius:12px;color:#cfdaea;font-size:17px}.chip:before{content:"";display:inline-block;width:8px;height:8px;margin-right:10px;border-radius:2px;background:#5b8cff}.chip:nth-child(2):before{background:#ff8a42}.chip:nth-child(3):before{background:#a9c7ff}
+  .foot{position:absolute;left:88px;bottom:64px;color:#7e8da4;font-size:17px;letter-spacing:.3px}
+  .visual{position:relative;display:flex;align-items:center;justify-content:center;height:590px}.glow{position:absolute;width:560px;height:500px;background:#5b8cff20;filter:blur(70px);border-radius:50%}
+  .window{position:relative;width:594px;padding:14px;border:1px solid #45536b;background:#171d29df;border-radius:34px;box-shadow:0 34px 70px #0009,0 0 0 8px #0a0e171f;transform:translateY(-2px)}
+  .window img{display:block;width:566px;height:auto;border-radius:24px}.local{position:absolute;right:4px;bottom:12px;padding:14px 22px;background:#111a29;border:1px solid #385277;border-radius:16px;color:#b8ceef;font-size:17px;box-shadow:0 12px 26px #0007}.local:before{content:"";display:inline-block;width:9px;height:9px;background:#72d6ad;border-radius:50%;margin-right:11px;box-shadow:0 0 12px #72d6ad66}
+</style>
+</head>
+<body>
+<div class="frame"></div>
+<main class="layout">
+  <section>
+    <div class="identity"><img src="island-hud-logo.svg" alt=""><div><div class="eyebrow">WINDOWS DESKTOP HUD</div><div class="subeyebrow">COMMUNITY · OPEN SOURCE</div></div></div>
+    <h1>Island <span>HUD</span></h1>
+    <div class="pixel-rule"><i></i><i></i><i></i></div>
+    <p class="tagline">AI 会话，一眼可见。</p>
+    <p class="desc">状态、审批与问答，都留在屏幕顶部。<br>少一次切换，多一分专注。</p>
+    <div class="chips"><span class="chip">会话状态</span><span class="chip">权限审批</span><span class="chip">多题问答</span></div>
+  </section>
+  <section class="visual"><div class="glow"></div><div class="window"><img src="../../screenshots/approval.png" alt="Island HUD 权限审批界面"></div><div class="local">本机连接 · 无需云端</div></section>
+</main>
+<div class="foot">Windows 10 / 11&nbsp;&nbsp; · &nbsp;&nbsp;DeepSeek Harness&nbsp;&nbsp; · &nbsp;&nbsp;ZCode</div>
+</body>
+</html>

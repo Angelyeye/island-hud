@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Island HUD — Horizon</title>
+  <desc id="desc">An amber status sun above a minimal island horizon on a warm light rounded square.</desc>
+  <defs>
+    <linearGradient id="paper" x1="160" y1="96" x2="824" y2="944" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFBF5"/>
+      <stop offset="1" stop-color="#FFE7CF"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="440" y1="268" x2="592" y2="428" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB13B"/>
+      <stop offset="1" stop-color="#FF6B35"/>
+    </linearGradient>
+    <filter id="soft" x="392" y="220" width="240" height="244" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#E86B2C" flood-opacity="0.22"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#paper)"/>
+  <rect x="34" y="34" width="956" height="956" rx="218" fill="none" stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="4"/>
+  <circle cx="512" cy="340" r="92" fill="url(#sun)" filter="url(#soft)"/>
+  <path d="M156 612H330C380 612 390 512 512 512C634 512 644 612 694 612H868" fill="none" stroke="#262238" stroke-width="56" stroke-linecap="round"/>
+  <path d="M368 730H656" fill="none" stroke="#F58A4B" stroke-width="24" stroke-linecap="round"/>
+</svg>

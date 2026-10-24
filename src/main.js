@@ -26,6 +26,7 @@ const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/se
 const sessionStore = new SessionStore();
 const presentation = require('./renderer/presentation.js');
 const { CompletionReader } = require('./app/completion-reader.cjs');
+const { createDiagnosticOutput } = require('./logs/diagnostic-output.cjs');
 const completionReader = new CompletionReader();
 
 let WIN_W = 568;
@@ -53,6 +54,21 @@ if (TEST_ROOT) {
   app.setPath('sessionData', path.join(TEST_ROOT, 'electron'));
   app.setName('Island HUD Development');
 }
+
+function reportDiagnosticStreamFailure(name, error) {
+  const code = error && typeof error.code === 'string' ? error.code : 'stream-error';
+  appendLog(`${new Date().toISOString()} ${name} unavailable (${code}); continuing with file logging\n`);
+}
+
+// Keep these listeners for the whole process lifetime. A closed terminal or test
+// harness otherwise emits an asynchronous EPIPE that surfaces as an Electron
+// "JavaScript error occurred in the main process" dialog.
+const diagnosticStdout = createDiagnosticOutput(process.stdout, {
+  onError: error => reportDiagnosticStreamFailure('stdout', error),
+});
+createDiagnosticOutput(process.stderr, {
+  onError: error => reportDiagnosticStreamFailure('stderr', error),
+});
 
 // Maintenance commands make login-cycle verification reproducible without
 // requiring UI automation. They act before the single-instance lock so they can
@@ -244,8 +260,8 @@ function diag(msg) {
   try {
     if (SHOT_DIR) fs.appendFileSync(SHOT_LOG, line);
     if (DIAG_FILE) fs.appendFileSync(DIAG_FILE, line);
-    if (!SHOT_DIR) process.stdout.write(line);
-  } catch { /* ignore */ }
+  } catch { /* file diagnostics are best-effort */ }
+  if (!SHOT_DIR) diagnosticStdout.write(line);
   appendLog(line);
 }
 

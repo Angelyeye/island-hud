@@ -15,7 +15,9 @@ async function main() {
   const actual = execFileSync(path.join(electron, 'electron.exe'), ['-p', 'process.versions.electron'], {
     encoding: 'utf8', windowsHide: true, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
   }).trim();
-  if (actual !== '33.4.11') throw new Error('Preserved Electron 33.4.11 runtime required');
+  // The packaged runtime must match the locked devDependency; bump both together.
+  const declared = metadata.devDependencies.electron;
+  if (actual !== declared) throw new Error(`Preserved Electron ${declared} runtime required`);
   require('./build-integrations.cjs');
   const portable = path.join(out, 'portable'), appRoot = path.join(portable, 'resources/app');
   fs.mkdirSync(appRoot, { recursive: true });
@@ -40,7 +42,8 @@ async function main() {
     verification: 'Protocol and GUI checks do not replace real-client verification; see README for known limitations' };
   status.sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
   status.sourceDirty = !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
-  status.helperBuild = JSON.parse(fs.readFileSync(path.join(root, 'src/tools/pipe-host-build.json'), 'utf8'));
+  status.helperBuild = Object.fromEntries(['pipe-host', 'foreground-watcher'].map(name =>
+    [name, JSON.parse(fs.readFileSync(path.join(root, `src/tools/${name}-build.json`), 'utf8'))]));
   fs.writeFileSync(path.join(portable, '打开悬浮岛.cmd'), '@echo off\r\nset ELECTRON_RUN_AS_NODE=\r\nstart "" "%~dp0IslandHUD.exe"\r\n');
   execFileSync(process.execPath, [path.join(root, 'tools/patch-exe.cjs'), path.join(portable, 'IslandHUD.exe'), path.join(root, 'build/icon.ico'), version], { windowsHide: true, stdio: 'inherit' });
   status.portableManifest = require('./artifact-manifest.cjs').create(portable);

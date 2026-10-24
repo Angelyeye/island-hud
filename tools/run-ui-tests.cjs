@@ -4,10 +4,11 @@ const path = require('node:path');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const root = path.resolve(__dirname, '..');
+const declared = require(path.join(root, 'package.json')).devDependencies.electron;
 const bundled = path.join(root, 'node_modules/electron/dist/electron.exe');
-const electron = process.env.ISLAND_HUD_ELECTRON || (fs.existsSync(bundled) ? bundled : path.resolve(root, '../electron-33.4.11/electron.exe'));
+const electron = process.env.ISLAND_HUD_ELECTRON || (fs.existsSync(bundled) ? bundled : path.resolve(root, `../electron-${declared}/electron.exe`));
 const version = execFileSync(electron, ['-p', 'process.versions.electron'], { windowsHide: true, encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim();
-if (version !== '33.4.11') throw new Error('Preserved Electron 33.4.11 runtime required');
+if (version !== declared) throw new Error(`Preserved Electron ${declared} runtime required`);
 const out = path.resolve(process.argv[2] || path.join(root, 'work/ui-tests', randomUUID()));
 fs.mkdirSync(out, { recursive: true });
 const cases = [['electron-runner.cjs', 'electron-test-result.json'], ['windows-input-runner.cjs', 'windows-input-result.json'],

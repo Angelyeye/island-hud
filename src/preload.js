@@ -15,7 +15,6 @@ contextBridge.exposeInMainWorld('island', {
   snapshot: () => ipcRenderer.invoke('island:snapshot'),
   setInteractive: (next) => ipcRenderer.send('island:interactive', next),
   setBounds: (b) => ipcRenderer.send('island:bounds', b),
-  openPath: (p) => ipcRenderer.invoke('island:openPath', p),
   focusSession: (sessionId) => ipcRenderer.invoke('island:focus', sessionId),
   hide: () => ipcRenderer.send('island:hide'),
   quit: () => ipcRenderer.send('island:quit'),

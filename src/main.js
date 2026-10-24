@@ -322,13 +322,55 @@ app.on('second-instance', (_event, argv) => {
   diag('second-instance: focused existing window');
 });
 
-/** Load the official Pixel Console artwork from assets copied into every package. */
+/** Last-resort icon drawn in code, used only when bundled assets are unavailable. */
+function fallbackAppIcon() {
+  const size = 32;
+  const buf = Buffer.alloc(size * size * 4);
+  const put = (x, y, r, g, b) => {
+    const i = (y * size + x) * 4;
+    buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const cx = x - size / 2 + 0.5, cy = y - size / 2 + 0.5;
+      const inSquare = Math.abs(cx) < 14 && Math.abs(cy) < 14;
+      if (inSquare) put(x, y, 13, 13, 16);
+      else buf[i + 3] = 0;
+    }
+  }
+  // 8×8 pixel pet scaled ×2, centred
+  const pet = [
+    '..##..##',
+    '........',
+    '.#....#.',
+    '..####..',
+    '..####..',
+    '.#.##.#.',
+  ];
+  const ox = 8, oy = 8;
+  for (let py = 0; py < pet.length; py++) {
+    for (let px = 0; px < pet[py].length; px++) {
+      if (pet[py][px] !== '#') continue;
+      for (let sy = 0; sy < 2; sy++) {
+        for (let sx = 0; sx < 2; sx++) {
+          put(ox + px * 2 + sx, oy + py * 2 + sy, 249, 115, 22);
+        }
+      }
+    }
+  }
+  return nativeImage.createFromBuffer(buf, { width: size, height: size });
+}
+
 function loadAppIcon(size = 256) {
   if (![16, 32, 256].includes(size)) throw new Error(`Unsupported app icon size: ${size}`);
   const file = path.join(__dirname, 'renderer', 'assets', `icon-${size}.png`);
-  const image = nativeImage.createFromPath(file);
-  if (image.isEmpty()) throw new Error(`Unable to load app icon: ${file}`);
-  return image;
+  try {
+    const image = nativeImage.createFromPath(file);
+    if (!image.isEmpty()) return image;
+  } catch { /* fall through to the generated icon */ }
+  diag(`app icon asset missing: ${file}; using generated fallback`);
+  return fallbackAppIcon();
 }
 
 function makeTrayIcon() {
@@ -827,7 +869,6 @@ ipcMain.handle('island:keyboard', (event, enabled) => {
   setKeyboard(!!enabled);
   return { accepted: true, focused: !!enabled && win?.isFocused() };
 });
-ipcMain.handle('island:openPath', (_e, p) => shell.openPath(p));
 ipcMain.handle('island:settings:get', () => settingsPayload());
 ipcMain.handle('island:environment:get', () => environmentPayload());
 ipcMain.on('island:activity', (event, value) => {
@@ -933,7 +974,7 @@ ipcMain.handle('island:logs:open', () => {
  * Hit-testing: poll the global cursor against the notch rounded rectangle
  * reported by the renderer. Electron's `ignoreMouseEvents(true, {forward:true})`
  * forwards moves on paper, but this is not reliable on every Windows/Electron
- * build; polling is deterministic and cheap (60ms) for a small overlay.
+ * build; polling is deterministic and cheap (30ms) for a small overlay.
  * The notch is docked to the top edge, so only the bottom corners are rounded.
  */
 function isPointInNotch(p, wb, b) {

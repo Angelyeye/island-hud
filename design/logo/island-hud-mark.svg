@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="32 160 960 704" role="img" aria-labelledby="title desc">
+  <title id="title">Island HUD — Pixel Console mark</title>
+  <desc id="desc">The standalone Island HUD pixel terminal mark with a blue command prompt and frame, light-blue activity waveform, and amber response light.</desc>
+  <g shape-rendering="crispEdges">
+    <g fill="#5B8CFF">
+      <rect x="192" y="192" width="640" height="64"/>
+      <rect x="128" y="256" width="768" height="64"/>
+      <rect x="64" y="320" width="896" height="384"/>
+      <rect x="128" y="704" width="768" height="64"/>
+      <rect x="192" y="768" width="640" height="64"/>
+    </g>
+    <g fill="#17191D">
+      <rect x="192" y="256" width="640" height="64"/>
+      <rect x="128" y="320" width="768" height="384"/>
+      <rect x="192" y="704" width="640" height="64"/>
+    </g>
+    <g fill="#5B8CFF">
+      <rect x="192" y="320" width="64" height="64"/>
+      <rect x="192" y="384" width="128" height="64"/>
+      <rect x="256" y="448" width="128" height="64"/>
+      <rect x="192" y="512" width="128" height="64"/>
+      <rect x="192" y="576" width="64" height="64"/>
+    </g>
+    <g fill="#A9C7FF">
+      <rect x="512" y="448" width="64" height="128"/>
+      <rect x="640" y="384" width="64" height="256"/>
+      <rect x="768" y="448" width="64" height="128"/>
+    </g>
+    <rect x="768" y="192" width="64" height="64" fill="#FF8A42"/>
+  </g>
+</svg>

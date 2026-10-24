@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Island HUD — Prompt Stack</title>
+  <desc id="desc">A chunky blue pixel prompt stacked above a floating waveform island with a small amber response beacon.</desc>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="#17191D"/>
+  <rect x="34" y="34" width="956" height="956" rx="218" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="4"/>
+  <g shape-rendering="crispEdges">
+    <g fill="#5B8CFF">
+      <rect x="192" y="128" width="128" height="64"/>
+      <rect x="256" y="192" width="128" height="64"/>
+      <rect x="320" y="256" width="128" height="64"/>
+      <rect x="256" y="320" width="128" height="64"/>
+      <rect x="192" y="384" width="128" height="64"/>
+      <rect x="320" y="512" width="384" height="64"/>
+      <rect x="256" y="576" width="512" height="64"/>
+      <rect x="192" y="640" width="640" height="128"/>
+      <rect x="256" y="768" width="512" height="64"/>
+      <rect x="320" y="832" width="384" height="64"/>
+    </g>
+    <g fill="#17191D">
+      <rect x="320" y="640" width="64" height="128"/>
+      <rect x="512" y="576" width="64" height="192"/>
+      <rect x="704" y="640" width="64" height="128"/>
+    </g>
+    <rect x="704" y="448" width="64" height="64" fill="#FF8A42"/>
+  </g>
+</svg>

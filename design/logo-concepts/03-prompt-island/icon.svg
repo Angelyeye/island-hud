@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Island HUD — Prompt Island</title>
+  <desc id="desc">A rounded terminal prompt and a cyan floating island on a deep violet rounded square.</desc>
+  <defs>
+    <radialGradient id="bg" cx="0" cy="0" r="1" gradientTransform="translate(260 190) rotate(49) scale(1050)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#282046"/>
+      <stop offset="0.55" stop-color="#151225"/>
+      <stop offset="1" stop-color="#0C0B14"/>
+    </radialGradient>
+    <linearGradient id="prompt" x1="254" y1="294" x2="488" y2="704" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D5A5FF"/>
+      <stop offset="0.5" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#7C6CF2"/>
+    </linearGradient>
+    <linearGradient id="island" x1="542" y1="640" x2="808" y2="728" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8DF3FF"/>
+      <stop offset="1" stop-color="#46C8EF"/>
+    </linearGradient>
+    <filter id="glow" x="190" y="238" width="662" height="566" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="22" flood-color="#755CE7" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="220" fill="url(#bg)"/>
+  <rect x="34" y="34" width="956" height="956" rx="218" fill="none" stroke="#C4B5FD" stroke-opacity="0.16" stroke-width="4"/>
+  <g filter="url(#glow)">
+    <path d="M278 302L474 512L278 722" fill="none" stroke="url(#prompt)" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="542" y="640" width="266" height="88" rx="44" fill="url(#island)"/>
+  </g>
+</svg>

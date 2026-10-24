@@ -306,44 +306,17 @@ app.on('second-instance', (_event, argv) => {
   diag('second-instance: focused existing window');
 });
 
-/** Build a tray icon in code (pixel pet on a rounded dark tile). */
+/** Load the official Pixel Console artwork from assets copied into every package. */
+function loadAppIcon(size = 256) {
+  if (![16, 32, 256].includes(size)) throw new Error(`Unsupported app icon size: ${size}`);
+  const file = path.join(__dirname, 'renderer', 'assets', `icon-${size}.png`);
+  const image = nativeImage.createFromPath(file);
+  if (image.isEmpty()) throw new Error(`Unable to load app icon: ${file}`);
+  return image;
+}
+
 function makeTrayIcon() {
-  const size = 32;
-  const buf = Buffer.alloc(size * size * 4);
-  const put = (x, y, r, g, b) => {
-    const i = (y * size + x) * 4;
-    buf[i] = r; buf[i + 1] = g; buf[i + 2] = b; buf[i + 3] = 255;
-  };
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const i = (y * size + x) * 4;
-      const cx = x - size / 2 + 0.5, cy = y - size / 2 + 0.5;
-      const inSquare = Math.abs(cx) < 14 && Math.abs(cy) < 14;
-      if (inSquare) put(x, y, 13, 13, 16);
-      else buf[i + 3] = 0;
-    }
-  }
-  // 8×8 pixel pet scaled ×2, centred
-  const pet = [
-    '..##..##',
-    '........',
-    '.#....#.',
-    '..####..',
-    '..####..',
-    '.#.##.#.',
-  ];
-  const ox = 8, oy = 8;
-  for (let py = 0; py < pet.length; py++) {
-    for (let px = 0; px < pet[py].length; px++) {
-      if (pet[py][px] !== '#') continue;
-      for (let sy = 0; sy < 2; sy++) {
-        for (let sx = 0; sx < 2; sx++) {
-          put(ox + px * 2 + sx, oy + py * 2 + sy, 249, 115, 22);
-        }
-      }
-    }
-  }
-  return nativeImage.createFromBuffer(buf, { width: size, height: size });
+  return loadAppIcon(32);
 }
 
 function createWindow() {
@@ -373,7 +346,7 @@ function createWindow() {
     focusable: true,
     show: false,
     acceptFirstMouse: true,
-    icon: makeTrayIcon(),
+    icon: loadAppIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -772,6 +745,7 @@ function openSettingsWindow() {
     autoHideMenuBar: true,
     title: 'Island HUD 设置',
     backgroundColor: '#151518',
+    icon: loadAppIcon(),
     show: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

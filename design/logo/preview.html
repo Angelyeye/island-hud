@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Island HUD — Pixel Console</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;font-family:"Segoe UI","Microsoft YaHei UI",sans-serif;background:#0b0d12;color:#f2f5fa}
+  body{padding:54px 64px;background:radial-gradient(circle at 18% 0%,#5b8cff1c 0,transparent 38%),radial-gradient(circle at 100% 100%,#a9c7ff10 0,transparent 38%),#0b0d12}
+  .sheet{max-width:1472px;margin:auto}.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:34px}
+  .eyebrow{font-size:14px;font-weight:700;letter-spacing:3px;color:#a9c7ff}.tag{font-size:13px;letter-spacing:2px;color:#9ba7b8;border:1px solid #2b3341;border-radius:999px;padding:10px 16px}
+  .hero{display:grid;grid-template-columns:560px 1fr;gap:70px;align-items:center;border:1px solid #293243;background:linear-gradient(135deg,#1a202bd9,#10141de8);border-radius:36px;padding:48px 58px;box-shadow:0 30px 90px #0006}
+  .icon-wrap{display:grid;place-items:center;min-height:480px;background:radial-gradient(circle,#5b8cff20,transparent 64%)}
+  .main-icon{width:440px;height:440px;filter:drop-shadow(0 26px 34px #0008)}
+  h1{font-size:72px;letter-spacing:-3px;margin:0 0 12px;line-height:1.05}h1 span{color:#5b8cff}
+  .subtitle{font-size:25px;margin:0 0 34px;color:#d7e2f2}.desc{font-size:17px;line-height:1.9;color:#9aa9be;max-width:590px;margin:0 0 32px}
+  .chips{display:flex;gap:10px;flex-wrap:wrap}.chip{font-size:14px;color:#d1dcec;border:1px solid #344054;background:#141a24;border-radius:999px;padding:10px 15px}.chip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;background:#5b8cff}.chip:nth-child(2) i{background:#a9c7ff}.chip:nth-child(3) i{background:#ff8a42}
+  .bottom{display:grid;grid-template-columns:1.25fr .75fr;gap:28px;margin-top:28px}.card{border:1px solid #273142;background:#111720;border-radius:26px;padding:28px 32px}.card h2{font-size:13px;letter-spacing:2px;color:#9fb4d2;margin:0 0 24px;text-transform:uppercase}
+  .sizes{display:flex;align-items:flex-end;gap:30px}.size{text-align:center;color:#8190a6;font-size:12px}.size img{display:block;margin:0 auto 12px}.s16{width:16px;height:16px}.s24{width:24px;height:24px}.s32{width:32px;height:32px}.s48{width:48px;height:48px}.s64{width:64px;height:64px}.s96{width:96px;height:96px}
+  .palette{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.swatch{height:76px;border-radius:16px;padding:12px;display:flex;align-items:flex-end;font:600 11px/1.2 Consolas,monospace;letter-spacing:.3px}.blue{background:#5b8cff;color:#101727}.lightblue{background:#a9c7ff;color:#172135}.orange{background:#ff8a42;color:#321608}.charcoal{background:#17191d;border:1px solid #394454;color:#d8e1ee}
+  .note{margin-top:22px;font-size:12px;line-height:1.7;color:#7f90a9}.dot{display:inline-block;width:6px;height:6px;background:#5b8cff;border-radius:1px;margin-right:8px;box-shadow:0 0 12px #5b8cff80}
+</style>
+</head>
+<body>
+<main class="sheet">
+  <header class="header"><div class="eyebrow">ISLAND HUD / VISUAL IDENTITY</div><div class="tag">OFFICIAL MARK · PIXEL CONSOLE</div></header>
+  <section class="hero">
+    <div class="icon-wrap"><img class="main-icon" src="island-hud-logo.svg" alt="Island HUD Pixel Console logo"></div>
+    <div>
+      <h1>Island <span>HUD</span></h1>
+      <p class="subtitle">像素终端，一眼可见。</p>
+      <p class="desc">蓝色像素外框同时是终端窗口与悬浮岛；命令提示符代表开发者工作流，浅蓝波形呈现会话活动。右上角只保留一枚橙色回应灯，让待处理状态清晰而克制。</p>
+      <div class="chips"><span class="chip"><i></i>Terminal / 命令</span><span class="chip"><i></i>Signal / 状态反馈</span><span class="chip"><i></i>Response / 待回应</span></div>
+    </div>
+  </section>
+  <section class="bottom">
+    <div class="card"><h2><span class="dot"></span>Small-size legibility / 小尺寸辨识度</h2><div class="sizes">
+      <div class="size"><img class="s16" src="island-hud-logo.svg">16 px</div><div class="size"><img class="s24" src="island-hud-logo.svg">24 px</div><div class="size"><img class="s32" src="island-hud-logo.svg">32 px</div><div class="size"><img class="s48" src="island-hud-logo.svg">48 px</div><div class="size"><img class="s64" src="island-hud-logo.svg">64 px</div><div class="size"><img class="s96" src="island-hud-logo.svg">96 px</div>
+    </div><div class="note">保留完整圆角底座与大块像素轮廓；16 / 24 / 32 px 使用实际尺寸导出，Windows ICO 包含七档尺寸。</div></div>
+    <div class="card"><h2>Core palette / 核心色</h2><div class="palette"><div class="swatch blue">#5B8CFF</div><div class="swatch lightblue">#A9C7FF</div><div class="swatch orange">#FF8A42</div><div class="swatch charcoal">#17191D</div></div><div class="note">蓝色像素是统一基底；橙色仅用于回应灯。正式标识已应用于 README、设置页、托盘、窗口与打包资源。</div></div>
+  </section>
+</main>
+</body>
+</html>

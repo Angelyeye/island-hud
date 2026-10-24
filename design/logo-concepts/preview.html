@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Island HUD — 4 Logo Directions</title>
+<style>
+  *{box-sizing:border-box}html,body{margin:0;width:1800px;height:1480px;overflow:hidden}
+  body{padding:40px 48px;background:radial-gradient(circle at 12% -10%,#202c4b 0,transparent 30%),radial-gradient(circle at 95% 110%,#231b38 0,transparent 29%),#0b0e14;color:#f5f7fb;font-family:"Segoe UI Variable Text","Segoe UI","Microsoft YaHei UI",sans-serif}
+  .header{height:96px;display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:3px;color:#8592aa;margin-bottom:10px}.header h1{font-size:40px;letter-spacing:-1.4px;margin:0;line-height:1.1}.header h1 span{color:#93a8ff}.header-right{text-align:right}.version{display:inline-block;border:1px solid #2a3344;border-radius:999px;padding:9px 14px;color:#a9b4c8;font:600 11px Consolas,monospace;letter-spacing:1.5px}.header-right p{margin:12px 0 0;color:#78869e;font-size:13px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:560px 560px;gap:22px}.card{--accent:#83aaff;position:relative;display:grid;grid-template-columns:280px 1fr;grid-template-rows:48px 1fr 96px;column-gap:28px;padding:26px 30px;background:linear-gradient(145deg,#151a24,#10141c);border:1px solid #252d3b;border-radius:28px;overflow:hidden}.card:before{content:"";position:absolute;width:360px;height:360px;left:-110px;top:80px;background:var(--accent);opacity:.055;filter:blur(60px);pointer-events:none}.card.horizon{--accent:#ff9a55}.card.prompt{--accent:#b69cff}.card.pixel{--accent:#ff7a1a}
+  .card-head{grid-column:1/-1;display:flex;align-items:flex-start;justify-content:space-between;position:relative;z-index:1}.concept{font:700 12px Consolas,monospace;letter-spacing:1.8px;color:var(--accent)}.concept span{color:#5e6c82;margin-right:12px}.badge{font-size:11px;font-weight:650;color:#cbd8ff;background:#4d6bfe1c;border:1px solid #4d6bfe55;padding:6px 10px;border-radius:999px}.card:not(.pulse) .badge{color:#8996aa;background:#ffffff05;border-color:#ffffff12}
+  .icon-stage{grid-column:1;grid-row:2/4;display:grid;place-items:center;position:relative}.icon-stage:after{content:"";position:absolute;width:210px;height:26px;bottom:34px;border-radius:50%;background:#000;opacity:.3;filter:blur(17px)}.icon{width:252px;height:252px;position:relative;z-index:1;filter:drop-shadow(0 18px 20px #0005)}
+  .card-body{grid-column:2;grid-row:2;align-self:center;position:relative}.wordmark{font-size:49px;font-weight:720;letter-spacing:-2.1px;line-height:1.05;margin:0 0 13px;white-space:nowrap}.wordmark span{color:var(--accent)}.prompt .wordmark{font-family:"Cascadia Code",Consolas,monospace;font-size:41px;letter-spacing:-2.7px}.pixel .wordmark{font-family:"Cascadia Code",Consolas,monospace;font-size:43px;letter-spacing:-2px}.name-cn{font-size:22px;font-weight:650;margin:0 0 13px;color:#eef2f8}.name-en{font:11px Consolas,monospace;letter-spacing:2px;color:#6f7e95;margin-left:10px}.desc{font-size:15px;line-height:1.75;color:#9ca9bc;margin:0;max-width:430px}.swatches{display:flex;gap:8px;margin-top:20px}.swatches i{width:28px;height:28px;border-radius:9px;border:1px solid #ffffff18;box-shadow:inset 0 0 0 1px #0000000d}
+  .card-foot{grid-column:2;grid-row:3;border-top:1px solid #252d39;padding-top:17px;display:flex;align-items:center;justify-content:space-between;align-self:end}.sizes{display:flex;align-items:flex-end;gap:17px}.size{text-align:center;color:#65738a;font:10px Consolas,monospace}.size img{display:block;margin:0 auto 7px}.s16{width:16px;height:16px}.s24{width:24px;height:24px}.s32{width:32px;height:32px}.s48{width:48px;height:48px}.fit{font-size:12px;line-height:1.6;color:#738197;text-align:right;max-width:160px}.fit b{display:block;color:#b7c2d3;font-size:12px;font-weight:600}
+  .footer{height:68px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;color:#69778d;font-size:12px}.footer strong{color:#a6b3c7;font-weight:600}.footer .dots{display:inline-flex;gap:6px;margin-right:10px;vertical-align:middle}.footer .dots i{width:7px;height:7px;border-radius:50%}.footer .dots i:nth-child(1){background:#4d6bfe}.footer .dots i:nth-child(2){background:#ff8a42}.footer .dots i:nth-child(3){background:#a78bfa}.footer .dots i:nth-child(4){background:#67e8f9}
+</style>
+</head>
+<body>
+<header class="header">
+  <div><div class="eyebrow">ISLAND HUD / VISUAL IDENTITY EXPLORATION</div><h1>一座岛，<span>四种个性。</span></h1></div>
+  <div class="header-right"><div class="version">4 DIRECTIONS · CONCEPT V1</div><p>原创矢量造型 · 未替换现有项目素材</p></div>
+</header>
+<main class="grid">
+  <section class="card pulse">
+    <div class="card-head"><div class="concept"><span>01</span>ISLAND PULSE</div><div class="badge">推荐 · 最贴产品</div></div>
+    <div class="icon-stage"><img class="icon" src="01-island-pulse/icon.svg" alt="Island Pulse 图标"></div>
+    <div class="card-body"><h2 class="wordmark">Island <span>HUD</span></h2><p class="name-cn">浮岛信号<span class="name-en">PRODUCT NATIVE</span></p><p class="desc">直接把悬浮岛、活动波形和待回应灯放进一个轮廓。信息最完整，也最容易和顶部 HUD 建立联系。</p><div class="swatches"><i style="background:#4d6bfe"></i><i style="background:#f7f9ff"></i><i style="background:#ff8a42"></i><i style="background:#2699ed"></i></div></div>
+    <div class="card-foot"><div class="sizes"><div class="size"><img class="s16" src="01-island-pulse/icon-16.png">16</div><div class="size"><img class="s24" src="01-island-pulse/icon-24.png">24</div><div class="size"><img class="s32" src="01-island-pulse/icon-32.png">32</div><div class="size"><img class="s48" src="01-island-pulse/icon-48.png">48</div></div><div class="fit"><b>现代、清晰、产品感</b>适合应用图标与 README</div></div>
+  </section>
+  <section class="card horizon">
+    <div class="card-head"><div class="concept"><span>02</span>HORIZON</div><div class="badge">最克制</div></div>
+    <div class="icon-stage"><img class="icon" src="02-horizon/icon.svg" alt="Horizon 图标"></div>
+    <div class="card-body"><h2 class="wordmark">Island <span>HUD</span></h2><p class="name-cn">视野边缘<span class="name-en">WARM MINIMAL</span></p><p class="desc">太阳是状态灯，弧线是岛，也是信息停留的视野边缘。延续原图标的暖橙色，但气质更安静、成熟。</p><div class="swatches"><i style="background:#fff4e8"></i><i style="background:#ff8a42"></i><i style="background:#262238"></i><i style="background:#ffb13b"></i></div></div>
+    <div class="card-foot"><div class="sizes"><div class="size"><img class="s16" src="02-horizon/icon-16.png">16</div><div class="size"><img class="s24" src="02-horizon/icon-24.png">24</div><div class="size"><img class="s32" src="02-horizon/icon-32.png">32</div><div class="size"><img class="s48" src="02-horizon/icon-48.png">48</div></div><div class="fit"><b>温暖、克制、有辨识度</b>适合独立品牌与横幅</div></div>
+  </section>
+  <section class="card prompt">
+    <div class="card-head"><div class="concept"><span>03</span>PROMPT ISLAND</div><div class="badge">最开发者</div></div>
+    <div class="icon-stage"><img class="icon" src="03-prompt-island/icon.svg" alt="Prompt Island 图标"></div>
+    <div class="card-body"><h2 class="wordmark">Island_<span>HUD</span></h2><p class="name-cn">命令岛<span class="name-en">DEVELOPER SOUL</span></p><p class="desc">把终端提示符 <b>&gt;</b> 与下划线改造成一座圆角岛。开发者一眼能懂，圆角几何又保留产品的轻量感。</p><div class="swatches"><i style="background:#151225"></i><i style="background:#a78bfa"></i><i style="background:#67e8f9"></i><i style="background:#282046"></i></div></div>
+    <div class="card-foot"><div class="sizes"><div class="size"><img class="s16" src="03-prompt-island/icon-16.png">16</div><div class="size"><img class="s24" src="03-prompt-island/icon-24.png">24</div><div class="size"><img class="s32" src="03-prompt-island/icon-32.png">32</div><div class="size"><img class="s48" src="03-prompt-island/icon-48.png">48</div></div><div class="fit"><b>Geek、利落、有性格</b>适合开源社区与 CLI</div></div>
+  </section>
+  <section class="card pixel">
+    <div class="card-head"><div class="concept"><span>04</span>PIXEL ISLAND</div><div class="badge">最延续</div></div>
+    <div class="icon-stage"><img class="icon" src="04-pixel-island/icon.svg" alt="Pixel Island 图标"></div>
+    <div class="card-body"><h2 class="wordmark">Island <span>HUD</span></h2><p class="name-cn">像素岛<span class="name-en">LEGACY REMIX</span></p><p class="desc">保留原图标的橙色像素 DNA，去掉机器人五官，换成像素胶囊、状态波形与一颗蓝色信标。</p><div class="swatches"><i style="background:#181818"></i><i style="background:#ff7a1a"></i><i style="background:#83aaff"></i><i style="background:#3b3b3b"></i></div></div>
+    <div class="card-foot"><div class="sizes"><div class="size"><img class="s16" src="04-pixel-island/icon-16.png">16</div><div class="size"><img class="s24" src="04-pixel-island/icon-24.png">24</div><div class="size"><img class="s32" src="04-pixel-island/icon-32.png">32</div><div class="size"><img class="s48" src="04-pixel-island/icon-48.png">48</div></div><div class="fit"><b>复古、直接、有延续性</b>适合保留老用户记忆</div></div>
+  </section>
+</main>
+<footer class="footer"><div><span class="dots"><i></i><i></i><i></i><i></i></span><strong>选择建议：</strong>产品识别选 01 · 独立气质选 02 · 开发者风格选 03 · 延续原图标选 04</div><div>SVG SOURCE + PNG EXPORTS + SMALL-SIZE CHECK</div></footer>
+</body>
+</html>

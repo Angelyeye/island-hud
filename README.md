@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="screenshots/hero.png" width="100%" alt="Island HUD：Windows 顶部的悬浮岛式 HUD，集中显示 DeepSeek Harness 与 ZCode 的会话、审批和问答" />
+<img src="screenshots/hero.png" width="100%" alt="Island HUD 像素终端岛：Windows 顶部的悬浮岛式 HUD，集中显示 DeepSeek Harness 与 ZCode 的会话、审批和问答" />
 
 <br />
 
@@ -8,7 +8,7 @@
 
 <p>
   <a href="https://github.com/Angelyeye/island-hud/actions/workflows/ci.yml"><img src="https://github.com/Angelyeye/island-hud/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/github/package-json/v/Angelyeye/island-hud?style=flat-square&label=version&color=4d6bfe" alt="version" />
+  <img src="https://img.shields.io/github/package-json/v/Angelyeye/island-hud?style=flat-square&label=version&color=5b8cff" alt="version" />
   <img src="https://img.shields.io/badge/license-AGPL--3.0--only-3da639?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d6?style=flat-square&logo=windows&logoColor=white" alt="Windows" />
   <img src="https://img.shields.io/badge/node-%E2%89%A5%2024-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js" />
@@ -213,6 +213,19 @@ npm run test:ui   # 需要真实桌面的 GUI 检查
 npm run test:tray # 托盘菜单检查
 ```
 
+### 品牌资源
+
+正式标识采用 **Pixel Console / 像素终端岛**：蓝色像素终端外框、命令提示符与活动波形，右上角保留一枚橙色回应灯。矢量源文件、独立图形、各尺寸 PNG、Windows ICO 和使用规范位于 [`design/logo/`](design/logo/README.md)。
+
+修改 Logo 后，从仓库根目录重新生成并同步所有品牌资源：
+
+```powershell
+npm run build:icon
+python design/logo/verify_exports.py
+```
+
+`build:icon` 会同时更新 README 主视觉、`build/` 打包图标和 `src/renderer/assets/` 运行时图标；需要 Windows Microsoft Edge。已经生成的旧安装包不会自动变化，重新打包后才会使用新图标。
+
 <details>
 <summary><b>展开目录结构</b></summary>
 
@@ -233,7 +246,8 @@ island-hud/
 ├─ tools/                  构建、打包、测试与发布脚本（含 C# 助手源码）
 ├─ test/                   Node 层测试
 ├─ screenshots/            README 主视觉与界面截图
-├─ build/                  打包配置与图标素材
+├─ design/logo/            Pixel Console 正式品牌源文件与导出脚本
+├─ build/                  打包配置与 Windows 图标
 └─ .github/                CI、DCO、Issue 模板与安全策略
 ```
 </details>

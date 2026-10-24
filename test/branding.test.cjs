@@ -57,5 +57,8 @@ test('Pixel Console brand assets stay synchronized across design, runtime, packa
   const main = read(root, 'src/main.js').toString('utf8');
   assert.match(main, /function loadAppIcon\(size = 256\)/);
   assert.match(main, /new Tray\(makeTrayIcon\(\)\)/);
-  assert.doesNotMatch(main, /pixel pet/);
+  // The primary icon must come from the bundled Pixel Console asset; a
+  // code-drawn icon is tolerated only as a load failure fallback.
+  assert.match(main, /function fallbackAppIcon\(\)/);
+  assert.match(main, /app icon asset missing/);
 });

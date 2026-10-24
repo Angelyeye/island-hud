@@ -5,8 +5,9 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
+const declared = require(path.join(root, 'package.json')).devDependencies.electron;
 const bundled = path.join(root, 'node_modules/electron/dist/electron.exe');
-const sibling = path.resolve(root, '../electron-33.4.11/electron.exe');
+const sibling = path.resolve(root, `../electron-${declared}/electron.exe`);
 const electron = process.env.ISLAND_HUD_TEST_EXECUTABLE || process.env.ISLAND_HUD_ELECTRON ||
   (fs.existsSync(bundled) ? bundled : sibling);
 if (!fs.existsSync(electron)) throw new Error('Electron runtime not found; set ISLAND_HUD_ELECTRON');

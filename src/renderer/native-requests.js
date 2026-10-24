@@ -61,7 +61,7 @@
     const head = request => window.IslandPresentation.header(sessionOf(request) || { title: request.payload.sessionTitle || '当前请求', cwd: request.payload.cwd, phase: request.kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer' }, {
       controls: `<button class="collapse-request" data-native-action="collapse" aria-label="收起卡片" title="收起卡片，保留待处理请求">−</button>` }) + `<div class="${request.kind === 'approval' ? 'appr-head' : 'ask-head'} native-head">
       ${request.kind === 'approval' ? '<span class="appr-dot"></span>' : askIcon()}
-      <span>${source(request)} · ${request.kind === 'approval' ? '权限请求' : request.blocking === false ? '可继续工作 · 待回答' : '需要回答后继续'}</span>
+      <span>${esc(source(request))} · ${request.kind === 'approval' ? '权限请求' : request.blocking === false ? '可继续工作 · 待回答' : '需要回答后继续'}</span>
       <span class="request-expiry" data-native-expiry>${esc(expiryText(request))}</span>
       <span class="appr-queue" data-native-queue>${requests.length > 1 ? `1 / ${requests.length} 待处理` : ''}</span></div>`;
     function updateControls() {

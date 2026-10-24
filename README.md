@@ -1,5 +1,9 @@
 <div align="center">
 
+<sub><b>简体中文</b> · <a href="README.en.md">English</a></sub>
+
+<br />
+
 <img src="screenshots/hero.png" width="100%" alt="Island HUD 像素终端岛：Windows 顶部的悬浮岛式 HUD，集中显示 DeepSeek Harness 与 ZCode 的会话、审批和问答" />
 
 <br />

@@ -13,7 +13,7 @@
     const drafts = window.createQuestionDraftCache({ storage });
     window.addEventListener('pagehide', () => { save(); drafts.flush(); });
     const submitted = new Map();
-    const source = () => 'DSH';
+    const source = request => window.IslandPresentation.meta(request?.provider).chip;
     const layerName = request => request?.kind === 'approval' ? 'approval' : 'ask';
     const layer = () => active ? layers[layerName(active)] : null;
     const answers = request => drafts.get(request);

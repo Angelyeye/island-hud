@@ -87,12 +87,18 @@
   const plain = text => String(text || '').replace(/^\s{0,3}(?:#{1,6}\s+|>\s?)/gm, '').replace(/```[^\n]*\n?/g, '').replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1（图片）').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
   function summary(text, limit = 1200) { const chars = Array.from(String(text || '')); return { text: chars.slice(0, limit).join(''), truncated: chars.length > limit }; }
   const labels = { running: '运行中', waitingForApproval: '等待审批', waitingForAnswer: '等待回答', completed: '已完成', idle: '空闲' };
+  const providers = {
+    dsh: { chip: 'DSH', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
+    zcode: { chip: 'ZCode', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
+  };
+  const meta = provider => providers[provider] || { chip: provider ? String(provider).toUpperCase() : 'HUD', title: '会话', subtitle: provider || '', focus: '在客户端', view: '在客户端查看' };
   function wave(phase = 'idle') {
     return '<span class="status-wave phase-' + escape(phase) + '" aria-hidden="true">' + [7, 13, 19, 11, 6].map((h, i) => '<i style="--bar:' + h + 'px;--delay:' + (-i * .17) + 's"></i>').join('') + '</span>';
   }
   function header(session = {}, options = {}) {
-    const title = session.title || 'DSH 会话', project = session.project || session.cwd?.split(/[\\/]/).filter(Boolean).pop() || '当前会话';
-    return '<header class="session-header">' + wave(session.phase || options.phase) + '<div class="session-heading"><h1 title="' + escape(project + ' · ' + title) + '">' + escape(project === title ? title : project + ' · ' + title) + '</h1><p>' + escape(session.lastUserText ? '你：' + session.lastUserText : options.subtitle || 'DeepSeek Harness') + '</p></div><span class="source-chip">DSH</span>' + (options.controls || '') + '</header>';
+    const pm = meta(session.provider);
+    const title = session.title || pm.title, project = session.project || session.cwd?.split(/[\\/]/).filter(Boolean).pop() || '当前会话';
+    return '<header class="session-header">' + wave(session.phase || options.phase) + '<div class="session-heading"><h1 title="' + escape(project + ' · ' + title) + '">' + escape(project === title ? title : project + ' · ' + title) + '</h1><p>' + escape(session.lastUserText ? '你：' + session.lastUserText : options.subtitle || pm.subtitle) + '</p></div><span class="source-chip">' + escape(pm.chip) + '</span>' + (options.controls || '') + '</header>';
   }
   class DisplayPolicy {
     constructor({ now = Date.now, settings = {} } = {}) { this.now = now; this.settings = normalize(settings); this.manualScene = null; this.hovered = false; this.hoverAt = null; this.leaveAt = null; this.protected = false; this.completion = null; this.seen = new Map(); }
@@ -124,5 +130,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, geometry, escape, safeLink, markdown, plain, summary, labels, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, geometry, escape, safeLink, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
 });

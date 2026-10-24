@@ -19,6 +19,7 @@ const { descriptorPath: nativeDescriptorPath } = require('./integrations/client'
 const updater = require('./update/updater');
 const { SessionStore } = require('./sessions/session-store.cjs');
 const { DshIntegrationManager } = require('./app/dsh-integration-manager.cjs');
+const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -31,7 +32,9 @@ let WIN_W = 568;
 let WIN_H = 624;
 
 const DEMO = process.argv.includes('--demo');
-const SHOT_DIR = process.env.ISLAND_SHOT_DIR || '';
+const SHOT_DIR = process.env.ISLAND_SHOT_DIR ? path.resolve(process.env.ISLAND_SHOT_DIR) : '';
+const SHOT_LOG = SHOT_DIR ? path.join(SHOT_DIR, 'app-shot.log') : '';
+const DIAG_FILE = process.env.ISLAND_DIAG_FILE ? path.resolve(process.env.ISLAND_DIAG_FILE) : '';
 
 const TEST_ROOT = process.env.ISLAND_HUD_TEST_ROOT || '';
 const IDLE_MONITOR = !!TEST_ROOT && process.env.ISLAND_TEST_IDLE_MODE === '1';
@@ -46,8 +49,7 @@ if (TEST_ROOT) {
     if (relative === '..' || relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) throw new Error(name + ' must stay in ISLAND_HUD_TEST_ROOT');
   }
   if (process.env.ISLAND_UPDATE_TEST_INSTALL) throw new Error('Isolated tests never launch an installer');
-  fs.mkdirSync(TEST_ROOT, { recursive: true });
-  app.setPath('userData', path.join(TEST_ROOT, 'electron'));
+  fs.mkdirSync(TEST_ROOT, { recursive: true });  app.setPath('userData', path.join(TEST_ROOT, 'electron'));
   app.setPath('sessionData', path.join(TEST_ROOT, 'electron'));
   app.setName('Island HUD Development');
 }
@@ -70,6 +72,7 @@ if (autoStartCommand !== null) {
   }
 }
 const DATA_DIR = TEST_ROOT || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData/Local'), 'IslandHUD');
+const BRIDGE_EVIDENCE_LOG = TEST_ROOT ? path.join(TEST_ROOT, 'bridge-evidence.jsonl') : '';
 const navigationDescriptorPath = () => path.join(DATA_DIR, 'navigation.json');
 function createDshIntegration({ timedQuestions = false } = {}) {
   return new DshIntegrationManager({
@@ -82,9 +85,20 @@ function createDshIntegration({ timedQuestions = false } = {}) {
     timedQuestions,
   });
 }
+function createZcodeIntegration() {
+  return new ZcodeIntegrationManager({
+    configPath: TEST_ROOT ? path.join(TEST_ROOT, 'zcode/cli/config.json')
+      : path.join(process.env.ZCODE_HOME || os.homedir(), '.zcode/cli/config.json'),
+    dataDir: DATA_DIR,
+    sourceDir: path.join(__dirname, '../integrations/zcode'),
+    descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
+    log: diag,
+  });
+}
 if (process.argv.includes('--uninstall-cleanup')) {
   try {
     createDshIntegration().remove();
+    createZcodeIntegration().remove();
     if (!TEST_ROOT) {
       const ownStartup = app.getLoginItemSettings({ path: process.execPath, name: 'Island HUD' });
       if (ownStartup.launchItems?.some(item => item.path?.toLowerCase() === process.execPath.toLowerCase())) {
@@ -137,7 +151,7 @@ function updateUrl() {
   return process.env.ISLAND_HUD_UPDATE_URL || settings.updateUrl || '';
 }
 
-async function checkForUpdates({ interactive = false, download = false, dryRun = false } = {}) {
+async function checkForUpdates({ interactive = false } = {}) {
   const url = updateUrl();
   if (!url) {
     diag('update-check unconfigured');
@@ -174,8 +188,8 @@ async function checkForUpdates({ interactive = false, download = false, dryRun =
         type: 'info',
         title: 'Island HUD 更新',
         message: `发现新版本 ${info.latestVersion}`,
-        detail: (info.notes || '') + '\n\n是否下载并安装？',
-        buttons: ['下载并安装', '稍后'],
+        detail: (info.notes || '') + '\n\n是否打开发布页下载？',
+        buttons: ['打开发布页', '稍后'],
         defaultId: 0,
         cancelId: 1,
         noLink: true,
@@ -184,17 +198,11 @@ async function checkForUpdates({ interactive = false, download = false, dryRun =
         diag('update-check postponed');
         return { status: 'postponed', info };
       }
+      await shell.openExternal(updater.RELEASES_URL);
+      diag('update-check opened releases page');
+      return { status: 'opened', info };
     }
-    if (!download) return { status: 'available', info };
-    const dl = await updater.downloadInstaller(info, { log: diag });
-    if (dryRun) {
-      diag('update-install dry-run ' + dl.file);
-      return { status: 'downloaded', info, file: dl.file, dryRun: true };
-    }
-    updater.launchInstaller(dl.file, { log: diag });
-    diag('update-install started; quitting for installer');
-    setTimeout(() => app.quit(), 1500);
-    return { status: 'installing', info, file: dl.file };
+    return { status: 'available', info };
   } catch (e) {
     diag('update-check error ' + e.message);
     if (interactive) {
@@ -234,8 +242,8 @@ function appendLog(line) {
 function diag(msg) {
   const line = `${new Date().toISOString()} ${msg}\n`;
   try {
-    if (SHOT_DIR) fs.appendFileSync(path.join(SHOT_DIR, 'app-shot.log'), line);
-    if (process.env.ISLAND_DIAG_FILE) fs.appendFileSync(process.env.ISLAND_DIAG_FILE, line);
+    if (SHOT_DIR) fs.appendFileSync(SHOT_LOG, line);
+    if (DIAG_FILE) fs.appendFileSync(DIAG_FILE, line);
     if (!SHOT_DIR) process.stdout.write(line);
   } catch { /* ignore */ }
   appendLog(line);
@@ -624,7 +632,7 @@ function buildTrayMenu() {
       id: 'tray.check-updates',
       label: updateUrl() ? '检查更新…' : '检查更新（未配置更新源）',
       enabled: !!updateUrl(),
-      click: () => checkForUpdates({ interactive: true, download: true }),
+      click: () => checkForUpdates({ interactive: true }),
     },
     {
       id: 'tray.settings',
@@ -699,6 +707,7 @@ function pipeHelperPath() {
 }
 
 const dshIntegration = createDshIntegration({ timedQuestions: settings.dshTimedQuestions === true });
+const zcodeIntegration = createZcodeIntegration();
 
 /* ----------------------------------------------------------------- diagnostics */
 function buildDiagnostics() {
@@ -740,6 +749,7 @@ function settingsPayload() {
     autoHideFullscreen: settings.autoHideFullscreen === true,
     dshTimedQuestions: settings.dshTimedQuestions === true,
     dsh: dshIntegration.status(),
+    zcode: zcodeIntegration.status(),
     displays: screen.getAllDisplays().length,
     autoStart: !TEST_ROOT && app.isPackaged ? loginItemState() : false,
   };
@@ -781,9 +791,17 @@ function openSettingsWindow() {
 
 // The installed DSH public protocol only focuses its application. Until a
 // precise session route is verified, report that limit without opening another session.
+// ZCode exposes no per-session deep link either; surface the project directory.
 ipcMain.handle('island:focus', async (_event, id) => {
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
+  if (session.provider === 'zcode') {
+    const dir = typeof session.cwd === 'string' ? session.cwd : '';
+    if (!dir) return { status: 'unsupported', sessionId: session.rawId, reason: '该会话未提供项目目录' };
+    const opened = await shell.openPath(dir);
+    return opened ? { status: 'unsupported', sessionId: session.rawId, reason: opened }
+      : { status: 'navigated', sessionId: session.rawId };
+  }
   if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
     reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
   const navigation = dshNavigation.request(session.rawId, 2500);
@@ -844,6 +862,13 @@ ipcMain.handle('island:dsh:manage', (event, action) => {
   if (action === 'install' || action === 'repair') return dshIntegration.install();
   if (action === 'remove') return dshIntegration.remove();
   throw new Error('未知的 DSH 集成操作');
+});
+ipcMain.handle('island:zcode:status', () => zcodeIntegration.status());
+ipcMain.handle('island:zcode:manage', (event, action) => {
+  if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('ZCode 集成管理只能从设置窗口操作');
+  if (action === 'install' || action === 'repair') return zcodeIntegration.install();
+  if (action === 'remove') return zcodeIntegration.remove();
+  throw new Error('未知的 ZCode 集成操作');
 });
 ipcMain.handle('island:settings:set', (event, patch = {}) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('设置只能从设置窗口保存');
@@ -977,7 +1002,7 @@ app.whenReady().then(() => {
     sessionStore.replaceProviderSnapshot('dsh', sessions);
     const summary = sessions.map((s) => `${s.project}:${s.phase}`).join(', ');
     diag('bridge ' + sessions.length + ' sessions [' + summary + ']');
-    if (win && !win.isDestroyed()) win.webContents.send('dsh:update', visibleSessions());
+    if (win && !win.isDestroyed()) win.webContents.send('island:sessions', visibleSessions());
   });
   bridge.start();
 
@@ -992,7 +1017,7 @@ app.whenReady().then(() => {
   // Both entrypoints use the same notch renderer and original invocation channels.
   const nativeLog = message => {
     diag(message);
-    if (TEST_ROOT) fs.appendFileSync(path.join(TEST_ROOT, 'bridge-evidence.jsonl'), JSON.stringify({ at: new Date().toISOString(), message }) + '\n');
+    if (BRIDGE_EVIDENCE_LOG) fs.appendFileSync(BRIDGE_EVIDENCE_LOG, JSON.stringify({ at: new Date().toISOString(), message }) + '\n');
   };
   let publishedSessions = '';
   const publishSessions = () => {
@@ -1004,21 +1029,22 @@ app.whenReady().then(() => {
     if (!idleHidden && !manuallyHidden && settings.autoHideWhenIdle && !active && !rendererExpanded && !rendererProtected && Date.now() - quietSince >= 30000) { idleHidden = true; setVisible(false, 'idle'); }
     if (serialized === publishedSessions) return;
     publishedSessions = serialized;
-    if (win && !win.isDestroyed()) win.webContents.send('dsh:update', snapshot);
+    if (win && !win.isDestroyed()) win.webContents.send('island:sessions', snapshot);
   };
   publishSessionsNow = publishSessions;
   integrationHub = new IntegrationHub({
-    allowedProviders: ['dsh'],
+    allowedProviders: ['dsh', 'zcode'],
     descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
     helperPath: pipeHelperPath(), log: nativeLog,
     onChange: requests => {
-      for (const request of requests) dshIntegration.observe(request);
+      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); }
       sessionStore.setRequests(requests);
       if (win && !win.isDestroyed()) win.webContents.send('island:native:requests', requests);
       publishSessions();
     },
     onEvent: request => {
       dshIntegration.observe(request);
+      zcodeIntegration.observe(request);
       sessionStore.applyEvent(request);
       const { event, requestId, outcome } = request.payload;
       if (requestId && ['ApprovalDecided', 'QuestionAnswered'].includes(event) && win && !win.isDestroyed()) {
@@ -1066,7 +1092,7 @@ app.whenReady().then(() => {
     tray, buildTrayMenu, targetDisplay, visibleState: () => visible,
   });
   if (!TEST_ROOT && updateUrl() && settings.autoCheckUpdates !== false && Date.now() - (Number(settings.lastUpdateCheck) || 0) > 24 * 3600 * 1000) {
-    setTimeout(() => { checkForUpdates({ interactive: false, download: false }); }, 12000);
+    setTimeout(() => { checkForUpdates({ interactive: false }); }, 12000);
   }
 
   app.on('activate', () => { if (!BrowserWindow.getAllWindows().length) createWindow(); });

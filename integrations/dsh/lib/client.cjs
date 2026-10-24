@@ -3,7 +3,7 @@ const net = require('node:net');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
-const { MAX_FRAME_BYTES } = require('./contract.cjs');
+const { MAX_FRAME_BYTES, timeoutFor } = require('./contract.cjs');
 function descriptorPath() {
   return process.env.ISLAND_HUD_BRIDGE_FILE || path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'IslandHUD', 'integration-v2.json');
 }
@@ -35,7 +35,7 @@ function exchange(envelope, { signal, descriptor = descriptorPath(), connectMs =
     sock.on('close', () => finish({ status: 'unavailable', reason: connected ? 'disconnected' : 'connect-failed' }));
     sock.once('connect', () => {
       connected = true; clearTimeout(connectionTimer);
-      const waitMs = envelope.kind === 'approval' ? 120000 : envelope.kind === 'question' ? 600000 : 1500;
+      const waitMs = timeoutFor(envelope.provider, envelope.kind) || 1500;
       waitTimer = setTimeout(() => { sock.destroy(); finish({ status: 'expired' }); }, waitMs);
       const frame = JSON.stringify({ ...envelope, v: 2, token: d.token });
       if (Buffer.byteLength(frame) > MAX_FRAME_BYTES) { sock.destroy(); return finish({ status: 'failed', reason: 'frame-too-large' }); }

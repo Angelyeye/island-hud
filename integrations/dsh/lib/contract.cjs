@@ -1,6 +1,16 @@
 'use strict';
-const PROVIDERS = new Set(['dsh']);
+const PROVIDERS = new Set(['dsh', 'zcode']);
 const MAX_FRAME_BYTES = 512 * 1024;
+// ZCode hook clients block the agent's own tool call while the island card is
+// open, so they may legitimately wait far longer than DSH's in-app flow.
+const TIMEOUT_MS = {
+  dsh: { approval: 120000, question: 600000 },
+  zcode: { approval: 24 * 3600000, question: 24 * 3600000 },
+};
+function timeoutFor(provider, kind) {
+  if (kind !== 'approval' && kind !== 'question') return 0;
+  return (TIMEOUT_MS[provider] || TIMEOUT_MS.dsh)[kind];
+}
 const keyOf = (provider, id) => JSON.stringify([provider, id]);
 const sessionKey = (provider, id) => id ? keyOf(provider, id) : null;
 
@@ -46,7 +56,7 @@ function validateRequest(msg) {
   if (!msg || !PROVIDERS.has(msg.provider) || typeof msg.id !== 'string' || !msg.id || msg.id.length > 500 ||
       !['approval', 'question', 'event'].includes(msg.kind)) throw new Error('Invalid envelope');
   if (msg.sessionId !== undefined && msg.sessionId !== null && (typeof msg.sessionId !== 'string' || msg.sessionId.length > 500)) throw new Error('Invalid session ID');
-  const timeoutMs = msg.kind === 'approval' ? 120000 : 600000;
+  const timeoutMs = timeoutFor(msg.provider, msg.kind);
   const payload = { ...(msg.payload || {}) };
   if (msg.kind === 'question') payload.questions = questionsOf(payload.questions);
   return { provider: msg.provider, requestId: msg.id, id: keyOf(msg.provider, msg.id),
@@ -65,4 +75,4 @@ function validateDecision(request, decision, extra = {}) {
   if (request.kind !== 'question' || decision !== 'answer') throw new Error('Invalid decision');
   return { decision: 'answer', answers: answersOf(request.payload.questions, extra.answers) };
 }
-module.exports = { PROVIDERS, MAX_FRAME_BYTES, keyOf, sessionKey, questionsOf, answersOf, validateRequest, validateDecision };
+module.exports = { PROVIDERS, TIMEOUT_MS, timeoutFor, MAX_FRAME_BYTES, keyOf, sessionKey, questionsOf, answersOf, validateRequest, validateDecision };

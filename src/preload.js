@@ -11,12 +11,12 @@ function listen(channel, callback) {
 // Component subscriptions still return explicit disposers for earlier release.
 
 contextBridge.exposeInMainWorld('island', {
-  onUpdate: cb => listen('dsh:update', cb),
+  onUpdate: cb => listen('island:sessions', cb),
   snapshot: () => ipcRenderer.invoke('island:snapshot'),
   setInteractive: (next) => ipcRenderer.send('island:interactive', next),
   setBounds: (b) => ipcRenderer.send('island:bounds', b),
   openPath: (p) => ipcRenderer.invoke('island:openPath', p),
-  focusDsh: (sessionId) => ipcRenderer.invoke('island:focus', sessionId),
+  focusSession: (sessionId) => ipcRenderer.invoke('island:focus', sessionId),
   hide: () => ipcRenderer.send('island:hide'),
   quit: () => ipcRenderer.send('island:quit'),
   keyboard: (enabled) => ipcRenderer.invoke('island:keyboard', !!enabled),
@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('island', {
     open: () => ipcRenderer.invoke('island:settings:open'),
     dshStatus: () => ipcRenderer.invoke('island:dsh:status'),
     dshManage: (action) => ipcRenderer.invoke('island:dsh:manage', action),
+    zcodeStatus: () => ipcRenderer.invoke('island:zcode:status'),
+    zcodeManage: (action) => ipcRenderer.invoke('island:zcode:manage', action),
     get: () => ipcRenderer.invoke('island:settings:get'),
     set: (patch) => ipcRenderer.invoke('island:settings:set', patch),
     onChange: cb => listen('island:settings:changed', cb),

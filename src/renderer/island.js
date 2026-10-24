@@ -26,6 +26,7 @@
       { id: 'demo-approval', rawId: 'demo-approval', provider: 'dsh', project: '发布工具', title: '更新配置文件', phase: 'waitingForApproval', updatedAt: now - 180000, currentTool: { name: 'write', detail: 'C:\\项目\\config.json' } },
       { id: 'demo-complete', rawId: 'demo-complete', provider: 'dsh', project: 'Island HUD', title: '回归测试已完成', phase: 'completed', turn: 1, updatedAt: now - 300000, completedAt: now - 300000, lastUserText: '检查本机问答、焦点和会话跳转', lastAssistantText: '## 验证完成\n\n- 中文问答保持原始值\n- 透明窗口边缘正确穿透\n- `56` 项回归检查通过\n\n```text\nDSH · 请求已完成\n```' },
       { id: 'demo-idle', rawId: 'demo-idle', provider: 'dsh', project: '维护任务', title: '整理构建缓存', phase: 'idle', updatedAt: now - 1800000 },
+      { id: 'demo-zcode', rawId: 'demo-zcode', provider: 'zcode', project: 'Island HUD', title: '排查管道回退路径', lastUserText: '看看 pipe-host 断开时桥接的回退逻辑', phase: 'running', updatedAt: now - 8000, currentTool: { name: 'Bash', detail: 'npm test', since: now - 3000 } },
     ];
   }
   function setHTML(el, html) { if (contents.get(el) === html && el.childNodes.length) return; contents.set(el, html); el.innerHTML = html; }
@@ -55,7 +56,7 @@
     return P.header(session, { controls: controls ? headerControls(session, { hide: hideActions }) : '' });
   }
   function rowHTML(s) {
-    return P.wave(s.phase) + '<div class="row-copy"><strong>' + esc(s.title || s.project || 'DSH 会话') + '</strong><small>' + esc(s.project || '当前项目') + (s.currentTool?.name ? ' · ' + esc(s.currentTool.name + ' ' + (s.currentTool.detail || '')) : '') + '</small></div><div class="row-tags">' + (s.model ? '<span class="source-chip">' + esc(s.model) + '</span>' : '') + '<span class="state-label phase-' + esc(s.phase) + '">' + esc(P.labels[s.phase] || s.phase) + '</span><time data-time="' + (s.updatedAt || Date.now()) + '">' + relative(s.updatedAt) + '</time><span class="row-arrow" aria-hidden="true">↗</span></div>';
+    return P.wave(s.phase) + '<div class="row-copy"><strong>' + esc(s.title || s.project || '会话') + '</strong><small>' + esc(s.project || '当前项目') + (s.currentTool?.name ? ' · ' + esc(s.currentTool.name + ' ' + (s.currentTool.detail || '')) : '') + '</small></div><div class="row-tags">' + (s.model ? '<span class="source-chip">' + esc(s.model) + '</span>' : '') + '<span class="state-label phase-' + esc(s.phase) + '">' + esc(P.labels[s.phase] || s.phase) + '</span><time data-time="' + (s.updatedAt || Date.now()) + '">' + relative(s.updatedAt) + '</time><span class="row-arrow" aria-hidden="true">↗</span></div>';
   }
   function renderRows(container, list) {
     const live = new Set(list.map(s => s.id));
@@ -81,7 +82,7 @@
     const completion = !request && !waiting ? policy.completion?.session : null;
     const top = request || waiting || activeSessions(state.sessions)[0] || state.sessions[0];
     let phase = request?.phase || top?.phase || 'idle';
-    let title = request?.text || (top?.currentTool?.name ? top.currentTool.name + ': ' + (top.currentTool.detail || top.title) : top?.title) || (state.syncingSessions ? '正在同步 DSH 会话…' : 'DSH · 等待会话');
+    let title = request?.text || (top?.currentTool?.name ? top.currentTool.name + ': ' + (top.currentTool.detail || top.title) : top?.title) || (state.syncingSessions ? '正在同步会话…' : '等待会话');
     if (completion) { phase = 'completed'; title = '已完成 · ' + P.plain(completion.lastAssistantText || completion.title).replace(/\s+/g, ' '); }
     const count = native.pending() ? apiRequestsCount() : state.sessions.filter(s => ['waitingForApproval','waitingForAnswer'].includes(s.phase)).length;
     setHTML(layers.compact, P.wave(phase) + '<span class="idle-text" title="' + esc(title) + '">' + esc(title) + '</span><span class="compact-counts">' + (count ? '<span class="pending-count">待处理 ' + count + '</span>' : '') + '<span class="idle-count">' + state.sessions.length + ' 会话</span></span>');
@@ -89,10 +90,10 @@
   function apiRequestsCount() { return native.summary()?.count || 0; }
   function renderOverview() {
     const list = state.sessions, hero = list.find(s => ['waitingForApproval','waitingForAnswer'].includes(s.phase)) || activeSessions(list)[0] || list[0];
-    if (!hero) { setHTML(layers.overview, '<div class="panel-top"><strong>DSH 会话</strong><button class="icon-button" data-act="settings" aria-label="设置">⚙</button><button class="collapse-request" data-act="collapse">−</button></div><div class="empty-state"><div class="empty-orbit">' + P.wave('idle') + '</div><h2>' + (state.syncingSessions ? '正在同步 DSH 会话…' : '小岛等待中') + '</h2><p>在 DSH 开始一个本机任务，状态将在这里显示。</p></div>'); return; }
+    if (!hero) { setHTML(layers.overview, '<div class="panel-top"><strong>会话</strong><button class="icon-button" data-act="settings" aria-label="设置">⚙</button><button class="collapse-request" data-act="collapse">−</button></div><div class="empty-state"><div class="empty-orbit">' + P.wave('idle') + '</div><h2>' + (state.syncingSessions ? '正在同步会话…' : '小岛等待中') + '</h2><p>开始一个本机任务，状态将在这里显示。</p></div>'); return; }
     const jump = ' data-act="jump" data-id="' + esc(hero.id) + '"';
     const heroHeader = sessionHeader(hero).replace('<header class="session-header"', '<header class="session-header hero-jump"' + jump);
-    const prefix = heroHeader + '<div class="hero-context hero-jump"' + jump + '><span class="state-label phase-' + esc(hero.phase) + '">' + esc(P.labels[hero.phase]) + '</span>' + (hero.currentTool ? '<code>' + esc(hero.currentTool.name + ' ' + (hero.currentTool.detail || '')) + '</code>' : '<p>' + esc(P.plain(hero.lastAssistantText || '').slice(0, 180)) + '</p>') + '</div><div class="overview-list"></div><footer class="panel-footer"><button class="text-button" data-act="overview-more">' + overviewMoreText(list.length) + '</button><span>点击会话打开 DSH ↗</span></footer>';
+    const prefix = heroHeader + '<div class="hero-context hero-jump"' + jump + '><span class="state-label phase-' + esc(hero.phase) + '">' + esc(P.labels[hero.phase]) + '</span>' + (hero.currentTool ? '<code>' + esc(hero.currentTool.name + ' ' + (hero.currentTool.detail || '')) + '</code>' : '<p>' + esc(P.plain(hero.lastAssistantText || '').slice(0, 180)) + '</p>') + '</div><div class="overview-list"></div><footer class="panel-footer"><button class="text-button" data-act="overview-more">' + overviewMoreText(list.length) + '</button><span>点击会话打开客户端 ↗</span></footer>';
     const existing = layers.overview.querySelector('.overview-list');
     if (!existing || layers.overview.dataset.hero !== hero.id) { setHTML(layers.overview, prefix); layers.overview.dataset.hero = hero.id; }
     else {
@@ -118,9 +119,9 @@
   function renderReadOnly(kind) {
     const target = kind === 'approval' ? layers.approval : layers.ask, phase = kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer';
     const s = state.sessions.find(item => item.phase === phase);
-    if (!s) { setHTML(target, '<div class="panel-top"><strong>DSH</strong><button data-act="collapse" class="collapse-request">−</button></div><div class="empty-state">暂无待处理' + (kind === 'approval' ? '审批' : '问题') + '</div>'); return; }
+    if (!s) { setHTML(target, '<div class="panel-top"><strong>客户端</strong><button data-act="collapse" class="collapse-request">−</button></div><div class="empty-state">暂无待处理' + (kind === 'approval' ? '审批' : '问题') + '</div>'); return; }
     const question = s.pendingQuestion || {};
-    setHTML(target, sessionHeader(s, { hideActions: false }) + '<div class="native-head">' + (kind === 'approval' ? '审批状态 · 只读预览' : '问题状态 · 只读预览') + '</div><div class="native-scroll readonly-card"><h2>' + esc(question.text || s.currentTool?.name || 'DSH 正在等待处理') + '</h2>' + (question.options || []).map((o, i) => '<div class="readonly-option"><span>' + (i + 1) + '</span><div><strong>' + esc(o.label) + '</strong><p>' + esc(o.description || '') + '</p></div></div>').join('') + '<p class="hint">当前只取得日志状态，回复由 DSH 原生界面处理。</p></div><footer class="native-buttons"><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">在 DSH 中' + (kind === 'approval' ? '审批' : '回答') + ' ↗</button></footer>');
+    setHTML(target, sessionHeader(s, { hideActions: false }) + '<div class="native-head">' + (kind === 'approval' ? '审批状态 · 只读预览' : '问题状态 · 只读预览') + '</div><div class="native-scroll readonly-card"><h2>' + esc(question.text || s.currentTool?.name || '客户端正在等待处理') + '</h2>' + (question.options || []).map((o, i) => '<div class="readonly-option"><span>' + (i + 1) + '</span><div><strong>' + esc(o.label) + '</strong><p>' + esc(o.description || '') + '</p></div></div>').join('') + '<p class="hint">当前只取得日志状态，回复由客户端原生界面处理。</p></div><footer class="native-buttons"><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">' + esc(P.meta(s.provider).focus) + (kind === 'approval' ? '审批' : '回答') + ' ↗</button></footer>');
   }
   function completionSession() { return state.sessions.find(s => s.id === completionFocus) || policy.completion?.session || state.sessions.find(s => s.phase === 'completed') || state.sessions[0]; }
   function renderCompletion() {
@@ -135,8 +136,8 @@
     const reply = fullReply?.key === key ? fullReply : null;
     const source = full ? reply?.text || '' : P.summary(s.lastAssistantText || '').text;
     const html = settings.completionView === 'text-summary' ? '<p class="plain-reply">' + esc(P.plain(source)) + '</p>' : P.markdown(source);
-    const content = full && loadingReply === key ? '<p class="hint">正在读取本回合完整回复…</p>' : full && reply?.status !== 'ok' ? '<p class="hint">本回合完整回复暂不可用，请在 DSH 查看。</p>' : html || '<p class="hint">客户端未提供结果正文。</p>';
-    setHTML(layers.jump, sessionHeader(s) + '<div class="native-head completed-head">✓ 本回合已完成</div><div class="completion-body native-scroll ' + (full ? 'full-reply' : 'summary-reply') + '">' + content + '</div>' + (reply?.truncated || !full && Array.from(s.lastAssistantText || '').length >= 1200 ? '<p class="hint">内容已截断 · 在 DSH 查看完整回复</p>' : '') + '<footer class="appr-btns"><button data-act="copy-reply">复制内容</button><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">在 DSH 查看 ↗</button></footer>');
+    const content = full && loadingReply === key ? '<p class="hint">正在读取本回合完整回复…</p>' : full && reply?.status !== 'ok' ? '<p class="hint">本回合完整回复暂不可用，请在客户端查看。</p>' : html || '<p class="hint">客户端未提供结果正文。</p>';
+    setHTML(layers.jump, sessionHeader(s) + '<div class="native-head completed-head">✓ 本回合已完成</div><div class="completion-body native-scroll ' + (full ? 'full-reply' : 'summary-reply') + '">' + content + '</div>' + (reply?.truncated || !full && Array.from(s.lastAssistantText || '').length >= 1200 ? '<p class="hint">内容已截断 · 在客户端查看完整回复</p>' : '') + '<footer class="appr-btns"><button data-act="copy-reply">复制内容</button><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">' + esc(P.meta(s.provider).view) + ' ↗</button></footer>');
   }
   function protectedState() { return native.protected() || composing || state.scene !== 'compact' && (!!window.getSelection()?.toString() || !!layers[state.scene]?.querySelector('details[open]') || document.activeElement?.tagName === 'TEXTAREA'); }
   function desiredScene() {
@@ -228,7 +229,7 @@
   }
   async function focusTerminal(s) {
     if (!s) return { status: 'expired' };
-    const result = preview || isDemo ? { status: 'navigated' } : await api?.focusDsh?.(s.id);
+    const result = preview || isDemo ? { status: 'navigated' } : await api?.focusSession?.(s.id);
     if (result?.status === 'navigated') showToast('已打开目标会话');
     else if (result?.status === 'expired') showToast('目标会话已失效，请在客户端查看');
     else showToast(result?.status === 'failed' && result.reason ? result.reason : '无法精确跳转，请在客户端手动打开');

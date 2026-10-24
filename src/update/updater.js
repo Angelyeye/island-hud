@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Island HUD updater.
+ * Island HUD update check.
  *
  * Manifest format (served over HTTPS in production):
  *   {
@@ -10,15 +10,10 @@
  *     "notes": "optional"
  *   }
  *
- * The updater intentionally requires a SHA-256 match before running anything.
- * Installers are unsigned personal builds, so checksum verification is the only
- * integrity check available.
+ * The updater only compares versions and reports the result. It never
+ * downloads or launches installers: builds are unsigned, so the user always
+ * fetches the artifact from the project's Releases page themselves.
  */
-const fs = require('node:fs');
-const path = require('node:path');
-const os = require('node:os');
-const crypto = require('node:crypto');
-const { spawn } = require('node:child_process');
 
 function normalizeVersion(v) {
   return String(v || '').trim().replace(/^v/i, '').split(/[-+]/)[0];
@@ -57,6 +52,8 @@ async function fetchManifest(manifestUrl, currentVersion) {
   if (!m.version) throw new Error('manifest missing version');
   if (!m.url) throw new Error('manifest missing url');
   const latestVersion = normalizeVersion(m.version);
+  // The version is displayed and compared; treat it as untrusted input.
+  if (!/^[0-9]+(\.[0-9]+)*$/.test(latestVersion)) throw new Error('manifest version invalid');
   return {
     latestVersion,
     currentVersion: normalizeVersion(currentVersion),
@@ -67,45 +64,11 @@ async function fetchManifest(manifestUrl, currentVersion) {
   };
 }
 
-async function downloadInstaller(info, { dir, log = () => {} } = {}) {
-  if (!info.sha256 || !/^[0-9a-f]{64}$/.test(info.sha256)) {
-    throw new Error('manifest sha256 missing/invalid (refusing unsigned unverified download)');
-  }
-  const targetDir = dir || path.join(os.tmpdir(), 'island-hud-update');
-  fs.mkdirSync(targetDir, { recursive: true });
-  const fileName = 'IslandHUD-Setup-' + info.latestVersion + '.exe';
-  const file = path.join(targetDir, fileName);
-  log(`update-download start ${info.url} -> ${file}`);
-
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 180000);
-  try {
-    const res = await fetch(info.url, { signal: ctrl.signal });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for installer`);
-    const buf = Buffer.from(await res.arrayBuffer());
-    const hash = crypto.createHash('sha256').update(buf).digest('hex');
-    if (hash !== info.sha256) {
-      throw new Error(`sha256 mismatch (expected ${info.sha256}, got ${hash})`);
-    }
-    fs.writeFileSync(file, buf);
-    log(`update-download ok ${file} bytes=${buf.length} sha256=${hash}`);
-    return { file, bytes: buf.length, sha256: hash };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function launchInstaller(file, { log = () => {}, args = ['/S'] } = {}) {
-  log(`update-install launch ${file} ${args.join(' ')}`);
-  const child = spawn(file, args, { detached: true, stdio: 'ignore', windowsHide: true });
-  child.unref();
-  return true;
-}
+const RELEASES_URL = 'https://github.com/Angelyeye/island-hud/releases';
 
 module.exports = {
   normalizeVersion,
   compareVersions,
   fetchManifest,
-  downloadInstaller,
-  launchInstaller,
+  RELEASES_URL,
 };

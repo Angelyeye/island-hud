@@ -1,10 +1,10 @@
 <div align="center">
 
-<img src="build/icon-256.png" width="88" alt="Island HUD 图标" />
+<img src="screenshots/hero.png" width="100%" alt="Island HUD：Windows 顶部的悬浮岛式 HUD，集中显示 DeepSeek Harness 与 ZCode 的会话、审批和问答" />
 
-# Island HUD
+<br />
 
-**Windows 顶部的悬浮岛式 HUD —— 让 DeepSeek Harness 与 ZCode 的会话、审批和问答，一直待在你的视野边缘。**
+**让会话、审批和问答，一直待在你的视野边缘。**
 
 <p>
   <a href="https://github.com/Angelyeye/island-hud/actions/workflows/ci.yml"><img src="https://github.com/Angelyeye/island-hud/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -15,81 +15,72 @@
 </p>
 
 <p>
-  <a href="#界面预览">界面预览</a> ·
-  <a href="#支持的客户端">支持的客户端</a> ·
   <a href="#功能特性">功能特性</a> ·
+  <a href="#界面预览">界面预览</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#安装集成">安装集成</a> ·
-  <a href="#工作原理与隐私">工作原理与隐私</a> ·
+  <a href="#工作原理与隐私">隐私设计</a> ·
+  <a href="#常见问题">常见问题</a> ·
   <a href="#参与贡献">参与贡献</a>
 </p>
 
 </div>
 
-岛形卡片常驻屏幕顶部，空闲时收成一条窄边。需要你决策时，它自动展开成审批或问答卡片 —— 允许一次、拒绝、或者选一个答案，都在岛上完成，不必切回终端翻找那个正在等你的窗口。
+Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成一条窄边，需要决策时展开为审批或问答卡片。允许一次、拒绝、选择答案，都不必切回终端寻找那个正在等待你的窗口。
 
-它把 **DeepSeek Harness（下称 DSH，原生插件接入）** 与 **ZCode（hook 配置接入）** 的会话合并在同一个列表里：同一个岛上，两类客户端的运行状态、待处理请求和完成结果一视同仁。
+它把 **DeepSeek Harness（DSH，原生插件接入）** 与 **ZCode（hook 配置接入）** 的会话合并在同一个列表里，让两类客户端的运行状态、待处理请求和完成结果，都能在同一座岛上看到。
 
 > [!IMPORTANT]
 > **非官方声明**：Island HUD 是独立的社区开源项目，与 DeepSeek、ZCode 及其他任何产品、公司、团队均无关联，也未获得任何形式的背书、授权或支持。
 
-<p align="center">
-  <img src="screenshots/approval.png" width="592" alt="在岛上处理权限请求" />
-  <br />
-  <sub>权限请求直接在岛上等待决策：允许一次、拒绝或返回客户端，会话在后台继续。</sub>
-</p>
-
 ---
+
+## 功能特性
+
+| ◉ 一眼看清 | ⚡ 就地决策 | 🗂 顺手管理 |
+| --- | --- | --- |
+| **会话状态**<br>当前会话、项目、工具与运行状态，一抬眼就能看到。<br><br>**完成提醒**<br>任务结束给出轻提示，点开即是本轮摘要。<br><br>**多会话浏览**<br>待处理与运行中优先，紧凑列表承载更多会话。 | **单次审批**<br>允许一次、拒绝或返回客户端，结果原路回传。<br><br>**多题问答**<br>单选、多选、自由文本，逐题保存草稿，兼容中文输入法。<br><br>**非阻塞接续**<br>卡片收起后请求仍在后台等待，稍后回答也不迟。 | **精确跳转**<br>点卡片直达 DSH 会话；ZCode 会话打开项目目录。<br><br>**归档与删除**<br>只在本机隐藏，不删除客户端数据，随时可恢复。<br><br>**外观可调**<br>密度、字号、最大高度与主题，均可在设置页实时预览。 |
 
 ## 界面预览
 
-<p align="center">
-  <img src="screenshots/overview.png" width="300" alt="会话总览" />
-  &nbsp;&nbsp;
-  <img src="screenshots/sessions.png" width="300" alt="全部会话" />
-  <br />
-  <sub>左：总览卡片，运行中 / 等待审批 / 已完成 / 空闲一眼可见。右：全部会话，待处理优先、最近活跃在前。</sub>
-</p>
+| 总览 · 工作状态一眼可见 | 会话 · 待处理优先 |
+| :---: | :---: |
+| <img src="screenshots/overview.png" width="100%" alt="Island HUD 会话总览" /> | <img src="screenshots/sessions.png" width="100%" alt="Island HUD 全部会话" /> |
+| <sub>运行中、等待审批、已完成与空闲，集中在一处。</sub> | <sub>待处理优先、最近活跃在前，快速定位目标会话。</sub> |
 
 <p align="center">
-  <img src="screenshots/settings.png" width="620" alt="集成设置" />
+  <img src="screenshots/settings.png" width="720" alt="Island HUD 集成设置" />
   <br />
-  <sub>设置页 · 集成：DSH 与 ZCode 各自显示连接状态、版本，安装 / 修复 / 卸载只需一次点击。</sub>
+  <sub><b>集成设置</b> · DSH 与 ZCode 各自显示连接状态和版本，安装、修复、卸载只需一次点击。</sub>
 </p>
 
 ## 支持的客户端
 
 | 客户端 | 接入方式 | 岛上能力 | 会话跳转 |
 | --- | --- | --- | --- |
-| **DeepSeek Harness** | 本机原生插件 | ✅ 会话状态 · ✅ 权限审批 · ✅ 多题问答（支持 timed 非阻塞） | 精确定位到对应会话 |
-| **ZCode** | 写入 hook 配置 | ✅ 会话状态 · ✅ 权限审批 · ✅ 多题问答（答案经审批面回传，实验性） | 打开会话所在项目目录 |
+| **DeepSeek Harness** | 本机原生插件 | 会话状态 · 权限审批 · 多题问答<br><sub>支持 timed 非阻塞</sub> | 精确定位到对应会话 |
+| **ZCode** | 写入 hook 配置 | 会话状态 · 权限审批 · 多题问答<br><sub>答案经审批面回传，实验性</sub> | 打开会话所在项目目录 |
 
-两类客户端共用同一套回环通道与同一块岛，列表里按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
-
-## 功能特性
-
-| ◉ 一眼看清 | ⚡ 就地决策 | 🗂 顺手管理 |
-| --- | --- | --- |
-| **会话状态**：当前会话、项目、当前工具与运行状态，空闲时自动收起为窄条。<br>**完成提醒**：任务结束给一次轻提示，点开即是本轮摘要。<br>**多会话浏览**：待处理与运行中优先，全部会话面板为紧凑滚动列表。 | **单次审批**：允许一次、拒绝、返回客户端，结果原路回传给 DSH / ZCode。<br>**多题问答**：单选、多选、自由文本，逐题保存草稿，兼容中文输入法。<br>**非阻塞接续**：卡片收起后请求仍在后台等待，稍后回答也不迟。 | **精确跳转**：点卡片直接进入 DSH 会话；ZCode 会话打开其项目目录。<br>**归档与删除**：只在本机隐藏，不删除客户端数据，随时可恢复。<br>**外观可调**：面板密度、字号、最大高度、主题，设置页内实时预览。 |
+两类客户端共用同一套回环通道与同一块岛，列表按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
 
 ## 快速开始
 
-### 直接使用发布版
+### 方式一：下载发布版
 
-公开产物见 [Releases](https://github.com/Angelyeye/island-hud/releases)。每个版本提供：
+**[→ 前往 Releases 下载](https://github.com/Angelyeye/island-hud/releases)**，每个版本提供：
 
-| 文件 | 说明 |
+| 文件 | 适合场景 |
 | --- | --- |
-| `IslandHUD-<版本>-DSH-portable-x64.zip` | 便携版，解压后直接运行 `IslandHUD.exe`，无需安装 Node.js |
-| `IslandHUD-<版本>-DSH-Setup-x64.exe` | NSIS 安装器，当前用户安装，支持覆盖升级与卸载 |
-| `SHA256SUMS.txt` | 所有产物的 SHA-256 校验值 |
+| `IslandHUD-<版本>-DSH-portable-x64.zip` | **便携使用**：解压后运行 `IslandHUD.exe`，无需安装 Node.js |
+| `IslandHUD-<版本>-DSH-Setup-x64.exe` | **安装使用**：当前用户安装，支持覆盖升级与卸载 |
+| `SHA256SUMS.txt` | **完整性校验**：包含所有产物的 SHA-256 校验值 |
 
 > [!NOTE]
 > 目前公开 Release 为 **v0.1.0**（仅 DSH）；**ZCode 支持已合入 `main`（v0.2.0）**，发布产物上线后本节会同步更新。想立刻体验 ZCode，请按下一节从源码运行。
 
 发布产物**尚未做代码签名**，Windows SmartScreen 可能提示未知发布者。请先用 `Get-FileHash` 核对 `SHA256SUMS.txt` 再运行；签名进度见 [代码签名策略](#代码签名策略)。
 
-### 从源码运行
+### 方式二：从源码运行
 
 ```powershell
 git clone https://github.com/Angelyeye/island-hud.git
@@ -103,13 +94,14 @@ npm start
 - `npm run build:helpers` 调用 Windows 自带的 .NET Framework 4 编译器，把 `tools/pipe-host.cs` 编译成管道助手；源码变更后会自动重建。
 - `npm start` 是**隔离开发模式**：使用独立的 `work/development` 配置与数据目录，不会改动你正在使用的 DSH / ZCode 配置与模型权限。正式使用请在设置页安装对应集成。
 
-**环境要求**：Windows 10 / 11（x64）、Node.js 24（自带 npm）、Electron（版本由 `package.json` 精确锁定）、可用的 `csc.exe`（用于构建管道助手）。
+> [!TIP]
+> **环境要求**：Windows 10 / 11（x64）、Node.js 24（自带 npm）、Electron（版本由 `package.json` 精确锁定），以及可用于构建管道助手的 `csc.exe`。
 
 ## 安装集成
 
 打开托盘图标右键菜单 →「设置…」，切到 **集成** 页。
 
-### DeepSeek Harness
+### DeepSeek Harness · 原生插件
 
 1. 确认 DSH 卡片状态为可连接。
 2. 点击「安装 / 修复」，等待写入完成；每次操作都会先备份现有配置。
@@ -117,20 +109,25 @@ npm start
 
 插件按受管方式写入 DSH 配置，卸载时点击「卸载集成」即可，不会删除 DSH 自身的会话数据。DSH 的插件扩展点尚未公开稳定，升级 DSH 后可能需要同步更新插件。
 
-### ZCode
+### ZCode · Hook 配置
 
 1. 确认 ZCode 卡片可点击，选择「安装 / 修复」。
 2. 安装把本集成添加的 hook 写入 ZCode 用户配置（`~/.zcode/cli/config.json`）：写入前自动备份，只改动本集成添加的条目。
 3. 重新发起一个 ZCode 会话即生效：会话状态、权限审批与提问会出现在岛上。
 4. 卸载时点击「卸载集成」，只移除本集成添加的 hook 条目。
 
-说明：
+<details>
+<summary><b>查看 ZCode 兼容、回退与冲突说明</b></summary>
+
+<br />
 
 - hook 脚本由 `node` 执行，请确保 Node.js 在 PATH 中。
 - 审批卡片打开期间，ZCode 的原生命令会等待岛上决策；退出 Island HUD 或长时间不响应时自动回退 ZCode 原生审批，不会卡死会话。ZCode 审批 / 问答卡片最长可等待 24 小时。
 - 只读工具（Read / Glob / Grep 等）与自动批准模式不会中转，行为与原生一致。
 - 问答经审批面回传答案（`updatedInput`）属实验性协议，失败时自动回退 ZCode 原生界面。
 - 若还安装了其他会在 `PermissionRequest` 上阻塞的 hook（例如别的审批桥），两者会同时等待响应；设置页会提示冲突，按需停用其一。
+
+</details>
 
 ## 工作原理与隐私
 
@@ -141,11 +138,13 @@ DSH 插件（原生插件） / ZCode（hook 配置）
 Island HUD  ──▶  顶部悬浮岛 · 设置页 · 托盘 · 全局热键
 ```
 
-- 桥接服务**只监听 `127.0.0.1`**，不监听局域网或公网地址，也不经过任何第三方服务。
-- 每次启动生成一次性 192-bit 本机令牌，仅保存在当前用户配置目录；请求必须携带令牌。
-- 配置目录与令牌文件的 ACL 在启动时收紧（`icacls`），管道助手使用显式 DACL，避免同机其他用户借用通道。
-- 应用**不收集遥测**，不做崩溃上报；唯一的联网行为是可关闭的更新检查（默认关闭）。
-- 集成安装前自动备份，且只修改本集成自己的条目，不改动你其他的插件或 hook。
+| 设计 | 具体行为 |
+| --- | --- |
+| **仅本机回环** | 桥接服务只监听 `127.0.0.1`，不监听局域网或公网地址，也不经过任何第三方服务。 |
+| **一次性令牌** | 每次启动生成 192-bit 本机令牌，仅保存在当前用户配置目录；请求必须携带令牌。 |
+| **权限收紧** | 配置目录与令牌文件的 ACL 在启动时收紧（`icacls`），管道助手使用显式 DACL，避免同机其他用户借用通道。 |
+| **无遥测** | 不收集遥测，不做崩溃上报；唯一的联网行为是可关闭的更新检查（默认关闭）。 |
+| **自动备份** | 集成安装前自动备份，只修改本集成自己的条目，不改动其他插件或 hook。 |
 
 本机数据存放于 `%LOCALAPPDATA%\IslandHUD`：
 
@@ -159,10 +158,10 @@ Island HUD  ──▶  顶部悬浮岛 · 设置页 · 托盘 · 全局热键
 
 | 快捷键 | 作用 |
 | --- | --- |
-| `Ctrl + Alt + I` | 显示 / 隐藏悬浮岛 |
-| `Ctrl + Alt + O` | 展开 / 收起全部会话面板 |
-| `Esc` | 收起当前展开的面板（不会拒绝或取消原请求） |
-| `Ctrl + Enter` | 问答检查页确认提交（输入法组合期间不触发） |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>I</kbd> | 显示 / 隐藏悬浮岛 |
+| <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>O</kbd> | 展开 / 收起全部会话面板 |
+| <kbd>Esc</kbd> | 收起当前展开的面板（不会拒绝或取消原请求） |
+| <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | 问答检查页确认提交（输入法组合期间不触发） |
 
 托盘右键菜单还可以：重新居中、切换显示器、设置全屏自动隐藏、打开日志目录、复制诊断信息。设置页包含 **通用 / 显示与动效 / 集成 / 快捷键 / 诊断与关于** 五页，外观调整带实时预览。
 
@@ -206,7 +205,7 @@ hook 由 `node` 执行：先确认 `node` 在 PATH 中，再重新发起一个 Z
 - 项目处于早期实验阶段，接口与界面仍可能调整。
 - 自动化测试覆盖 Node 层逻辑；GUI 与托盘行为需要真实桌面手动验证。
 
-## 测试与目录结构
+## 开发与测试
 
 ```powershell
 npm test          # Node 层单元与集成测试，CI 只跑这一项
@@ -215,7 +214,7 @@ npm run test:tray # 托盘菜单检查
 ```
 
 <details>
-<summary><b>目录结构</b></summary>
+<summary><b>展开目录结构</b></summary>
 
 ```text
 island-hud/
@@ -233,7 +232,7 @@ island-hud/
 ├─ integrations/           生成的 DSH 插件包与 ZCode hook 客户端
 ├─ tools/                  构建、打包、测试与发布脚本（含 C# 助手源码）
 ├─ test/                   Node 层测试
-├─ screenshots/            README 界面截图
+├─ screenshots/            README 主视觉与界面截图
 ├─ build/                  打包配置与图标素材
 └─ .github/                CI、DCO、Issue 模板与安全策略
 ```
@@ -269,6 +268,10 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 
 [![](https://img.shields.io/badge/powered_by-dsh-4D6BFE?style=flat-square&logo=deepseek&logoColor=white)](https://github.com/deepseek-ai/deepseek-harness)
 
+<br /><br />
+
 <sub>如果这个小岛对你的工作流有用，欢迎点一个 ⭐ Star。</sub>
+<br />
+<sub>让信息停在视野边缘，让专注留在当前窗口。</sub>
 
 </div>

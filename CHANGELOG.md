@@ -11,6 +11,7 @@
 - Electron 运行时校验改为跟随 `package.json` 锁定版本（原为硬编码 33.4.11）：升级 Electron 后 `npm start` / UI 测试 / 打包不再需要逐处改代码。
 - 移除未被任何界面使用的 `island.openPath` IPC 通道（无发送方校验的任意路径打开入口）。
 - 岛上审批卡片的来源徽标文本统一转义；应用图标资产缺失时回退到程序绘制图标，不再让启动路径抛错。
+- 修复 renderer GUI 测试与 v0.2.0 渲染层的脱节：同步提示文案断言与 ZCode 多 provider 化后的实际界面一致，会话推送通道名更新为 `island:sessions`（`npm run test:ui` 在 Electron 42 下全部 runner 通过）。
 
 ### 变更
 

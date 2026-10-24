@@ -1,0 +1,11 @@
+{
+  "hooks": {
+    "SessionStart": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "UserPromptSubmit": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "PreToolUse": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "PostToolUse": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "PostToolUseFailure": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "Stop": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 10000, "statusMessage": "Island HUD" }] }],
+    "PermissionRequest": [{ "hooks": [{ "type": "process", "command": "node", "args": ["${ZCODE_PLUGIN_ROOT}/scripts/island-hook.mjs"], "timeoutMs": 86400000, "statusMessage": "Island HUD" }] }]
+  }
+}

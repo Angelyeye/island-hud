@@ -1,13 +1,13 @@
 'use strict';
 const path = require('node:path');
-const { keyOf, sessionKey } = require('../integrations/contract');
+const { keyOf, sessionKey, PROVIDERS } = require('../integrations/contract');
 const rank = phase => ({ waitingForApproval: 0, waitingForAnswer: 1, running: 2, completed: 3, idle: 4 }[phase] ?? 4);
 class SessionStore {
   constructor({ now = Date.now, staleMs = 30 * 60000 } = {}) {
     this.now = now; this.staleMs = staleMs; this.sessions = new Map(); this.requests = new Map(); this.confirmations = new Map();
   }
   entry(provider, rawId) {
-    if (!['dsh'].includes(provider) || typeof rawId !== 'string' || !rawId) throw new Error('Verified source and session ID required');
+    if (!PROVIDERS.has(provider) || typeof rawId !== 'string' || !rawId) throw new Error('Verified source and session ID required');
     const id = keyOf(provider, rawId);
     if (!this.sessions.has(id)) this.sessions.set(id, { id, rawId, provider, log: null, native: null, tools: new Map() });
     return this.sessions.get(id);
@@ -35,6 +35,11 @@ class SessionStore {
     const next = { ...entry.native, updatedAt, evidence: 'native' };
     if (payload.cwd) { next.cwd = payload.cwd; next.project = path.basename(payload.cwd); }
     if (event === 'SessionTitle' && typeof payload.title === 'string') next.title = payload.title;
+    // Hook-based providers send the prompt inline; keep the last user text visible.
+    if (event === 'UserPromptSubmit') {
+      if (typeof payload.prompt === 'string' && payload.prompt.trim()) next.lastUserText = payload.prompt.slice(0, 300);
+      if (typeof payload.title === 'string' && payload.title.trim()) next.title = payload.title;
+    }
     if (['UserPromptSubmit', 'PreToolUse', 'SessionStart'].includes(event)) { next.phase = 'running'; next.completedAt = 0; }
     if (event === 'PreToolUse') { entry.tools.set(payload.tool?.id || 'current', { ...payload.tool, since: updatedAt }); next.currentTool = [...entry.tools.values()].at(-1); }
     if (event === 'PostToolUse') {
@@ -43,10 +48,10 @@ class SessionStore {
     }
     if (event === 'Stop') { next.phase = 'completed'; next.completedAt = updatedAt; next.currentTool = null; if (Number.isSafeInteger(payload.turn)) next.turn = payload.turn; entry.tools.clear(); }
     if (event === 'Interrupt' || event === 'SessionEnd') { next.phase = 'idle'; next.currentTool = null; entry.tools.clear(); }
-    if (event === 'ApprovalDecided' && envelope.provider === 'dsh' && payload.requestId && ['allowed-once', 'rejected', 'cancelled', 'unavailable'].includes(payload.outcome)) {
+    if (event === 'ApprovalDecided' && PROVIDERS.has(envelope.provider) && payload.requestId && ['allowed-once', 'rejected', 'cancelled', 'unavailable'].includes(payload.outcome)) {
       this.confirmations.set(keyOf(envelope.provider, payload.requestId), { provider: envelope.provider, sessionId: envelope.sessionId, outcome: payload.outcome, at: updatedAt });
     }
-    if (event === 'QuestionAnswered' && envelope.provider === 'dsh' && payload.requestId && payload.outcome === 'answered') {
+    if (event === 'QuestionAnswered' && PROVIDERS.has(envelope.provider) && payload.requestId && payload.outcome === 'answered') {
       this.confirmations.set(keyOf(envelope.provider, payload.requestId), { provider: envelope.provider, sessionId: envelope.sessionId, outcome: 'answered', at: updatedAt });
     }
     entry.native = next; return true;

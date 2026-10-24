@@ -2,6 +2,28 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。日期按本地时区记录。
 
+## [0.2.0] - 2026-10-24
+
+### 新增
+
+- **ZCode 支持**：通过 ZCode hook 接入，岛上展示 ZCode 会话状态，权限审批与多题问答可在岛上直接决策，与 DSH 会话合并在同一个列表里。
+- 设置页新增 ZCode 集成卡片：安装 / 修复 / 卸载会把 hook 写入 `~/.zcode/cli/config.json`，写入前自动备份，只改动本集成添加的条目；检测到其他 `PermissionRequest` hook 时提示共存冲突。
+- ZCode 问答经审批面回传答案（`updatedInput`），属实验性协议；失败时自动回退 ZCode 原生界面。
+- 集成超时改为按客户端区分：ZCode 审批 / 问答卡片可等待最长 24 小时，DSH 保持原有 120 秒 / 600 秒。
+
+### 变更
+
+- 会话更新通道 `dsh:update` 更名为内部通道 `island:sessions`；预加载 API `focusDsh` 更名为 `focusSession`。
+- `island:focus` 对 ZCode 会话打开其项目目录（ZCode 暂无会话深链）。
+- 更新检查不再自动下载并运行安装器：发现新版本时引导用户打开 GitHub Releases 页面自行下载；清单版本作为不可信输入校验（仅数字与点）。
+- 诊断与桥接证据日志路径在启动时一次性解析为常量。
+
+### 说明
+
+- ZCode hook 脚本由 `node` 执行，需要 Node.js 在 PATH 中。
+- 只读工具与自动批准模式不经过岛上审批，行为与原生一致。
+- `--uninstall-cleanup` 现在会同时移除 DSH 与 ZCode 集成。
+
 ## [0.1.0] - 2026-10-24
 
 首个公开发布版本。

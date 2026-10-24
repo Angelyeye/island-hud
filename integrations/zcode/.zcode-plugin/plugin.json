@@ -1,0 +1,9 @@
+{
+  "name": "island-hud-zcode-bridge",
+  "version": "0.1.0",
+  "description": "Island HUD bridge: shows ZCode session status on the island and relays permission approvals and questions",
+  "author": { "name": "Angelyeye" },
+  "license": "AGPL-3.0-only",
+  "repository": "https://github.com/Angelyeye/island-hud",
+  "hooks": "hooks"
+}

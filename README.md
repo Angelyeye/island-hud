@@ -115,6 +115,15 @@ npm run test:tray
 
 欢迎提交问题与改进。开始之前请阅读 [贡献指南](.github/CONTRIBUTING.md)，提交的每个 commit 需要包含 `Signed-off-by` 行（DCO）；安全问题请按 [安全策略](.github/SECURITY.md) 私下上报，不要公开提交带令牌、日志或本机路径的内容。
 
+## 代码签名策略
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [Angelyeye](https://github.com/Angelyeye)
+- Approvers: [Angelyeye](https://github.com/Angelyeye)
+
+目前正在申请 SignPath Foundation 免费开源签名；**在申请通过并发布首个签名版本前，所有发布产物均为未签名状态**。签名覆盖范围、验证方式与隐私说明见 [Code signing policy](.github/CODE_SIGNING_POLICY.md)。
+
 ## 许可证
 
 本项目以 **GNU Affero General Public License v3.0**（AGPL-3.0-only）发布，版权归 **Angelyeye** 所有，完整条款见 [LICENSE](LICENSE)。第三方依赖及其许可见 [NOTICE](NOTICE)；其中 `integrations/dsh/preset-standard.patch.yml` 基于 DeepSeek DSH 的 MIT 许可 preset 修改，版权与许可声明见该文件头及 NOTICE。

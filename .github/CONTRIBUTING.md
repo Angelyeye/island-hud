@@ -19,6 +19,7 @@ npm test
 - `main` 是发布分支，只接受通过 PR 合入的改动，请勿直接向 `main` 推送。
 - 开发时从最新的 `main` 拉出功能分支，命名参考：`feat/session-list-scroll`、`fix/tray-menu-crash`、`docs/readme-typos`、`chore/upgrade-electron`。
 - 一个 PR 只做一件事，避免把格式化、重构和功能混在一起。
+- 文档分中英两份：`README.md` 是简体中文主版本（仓库首页默认展示，内容以它为准），`README.en.md` 是英文镜像；改动功能说明、命令或数字时请同步更新两份，避免两者不一致。
 
 ## DCO 签名
 

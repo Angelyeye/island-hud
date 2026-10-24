@@ -80,7 +80,7 @@ Both clients share the same loopback channel and the same island. The list sorts
 | `SHA256SUMS.txt` | **Integrity check**: SHA-256 checksums for every artifact |
 
 > [!NOTE]
-> The public release is currently **v0.1.0** (DSH only). **ZCode support is already merged into `main` (v0.2.0)**, and this section will be updated once the release artifacts ship. To try ZCode right now, run from source as described in the next section.
+> The latest release is **v0.2.0** (DSH + ZCode): ZCode support, a fix for auto-hide on fullscreen, and a runtime upgrade to Electron 42. To upgrade from v0.1.0, simply install over it — settings and integration config are preserved.
 
 Release artifacts **are not code-signed yet**, so Windows SmartScreen may warn about an unknown publisher. Verify `SHA256SUMS.txt` with `Get-FileHash` before running anything; see the [code signing policy](#code-signing-policy) for progress.
 

@@ -32,7 +32,7 @@
 
 Island HUD is an island-shaped card that lives at the top of your Windows screen: it collapses into a narrow strip while idle and expands into an approval or question card when a decision is needed. Allow once, deny, or pick an answer — no more switching back to the terminal to hunt for the window that is waiting on you.
 
-It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCode (via hook configuration)** into a single list, so the runtime status, pending requests, and finished results of both clients stay visible on the same island.
+It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCode / Claude Code / Codex (via hook configuration)** into a single list, so the runtime status, pending requests, and finished results of every client stay visible on the same island.
 
 > [!IMPORTANT]
 > **Unofficial notice**: Island HUD is an independent community open-source project. It is not affiliated with DeepSeek, ZCode, or any other product, company, or team, and it has not received endorsement, authorization, or support from any of them in any form.
@@ -43,7 +43,7 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 
 | ◉ At a glance | ⚡ Decide in place | 🗂 Manage as you go |
 | --- | --- | --- |
-| **Session status**<br>Current session, project, tools, and run state — visible at a glance.<br><br>**Completion alerts**<br>A light hint when a task finishes; open it for the summary of that turn.<br><br>**Multi-session browsing**<br>Pending and running sessions come first, and the compact list holds more of them. | **Single approval**<br>Allow once, deny, or return to the client — the result goes back the way it came.<br><br>**Multi-question prompts**<br>Single choice, multiple choice, or free text; drafts are saved per question, and Chinese IME input works as expected.<br><br>**Non-blocking continuation**<br>The request keeps waiting in the background after the card collapses, so you can answer later. | **Precise jump**<br>Click a card to land in the DSH session; a ZCode session opens its project directory.<br><br>**Archive and delete**<br>Hides things locally only — no client data is deleted, and everything can be restored.<br><br>**Adjustable appearance**<br>Density, font size, maximum height, and theme all preview live on the settings page. |
+| **Session status**<br>Current session, project, tools, and run state — visible at a glance.<br><br>**Completion alerts**<br>A light hint when a task finishes; open it for the summary of that turn.<br><br>**Multi-session browsing**<br>Pending and running sessions come first, and the compact list holds more of them. | **Single approval**<br>Allow once, deny, or return to the client — the result goes back the way it came.<br><br>**Multi-question prompts**<br>Single choice, multiple choice, or free text; drafts are saved per question, and Chinese IME input works as expected.<br><br>**Non-blocking continuation**<br>The request keeps waiting in the background after the card collapses, so you can answer later. | **Precise jump**<br>Click a card to land in the DSH session; a ZCode / Claude Code / Codex session opens its project directory.<br><br>**Archive and delete**<br>Hides things locally only — no client data is deleted, and everything can be restored.<br><br>**Adjustable appearance**<br>Density, font size, maximum height, and theme all preview live on the settings page. |
 
 ## Screenshots
 
@@ -55,7 +55,7 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 <p align="center">
   <img src="screenshots/settings.png" width="720" alt="Island HUD integration settings" />
   <br />
-  <sub><b>Integration settings</b> · DSH and ZCode each show their connection status and version; install, repair, and uninstall are one click each.</sub>
+  <sub><b>Integration settings</b> · DSH / ZCode / Claude Code / Codex each show their connection status and version; install, repair, and uninstall are one click each.</sub>
 </p>
 
 ## Supported clients
@@ -64,8 +64,11 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 | --- | --- | --- | --- |
 | **DeepSeek Harness** | Local native plugin | Session status · permission approval · multi-question prompts<br><sub>supports timed non-blocking mode</sub> | Jumps to the exact session |
 | **ZCode** | Writes hook configuration | Session status · permission approval · multi-question prompts<br><sub>answers are returned through the approval surface, experimental</sub> | Opens the project directory of the session |
+| **Claude Code** | Writes hook configuration | Session status · permission approval · AskUserQuestion prompts | Opens the project directory of the session |
+| **Codex CLI** | Writes hook configuration | Session status · permission approval<br><sub>approvals in interactive (TUI) sessions only; trust once via /hooks</sub> | Opens the project directory of the session |
+| ~~ChatGPT desktop~~ | No official interface | ——<br><sub>no local integration surface, not supported</sub> | —— |
 
-Both clients share the same loopback channel and the same island. The list sorts pending work first, with the most recently active on top; when one client has many sessions, up to 50 are shown at a time.
+All clients share the same loopback channel and the same island. The list sorts pending work first, with the most recently active on top; when one client has many sessions, up to 50 are shown at a time.
 
 ## Quick start
 
@@ -96,7 +99,7 @@ npm start
 
 - `npm ci` installs dependencies strictly from the lockfile. If the Electron binary download is restricted, point `$env:ELECTRON_MIRROR` at a mirror temporarily.
 - `npm run build:helpers` uses the .NET Framework 4 compiler bundled with Windows to build `tools/pipe-host.cs` into the pipe helper, and rebuilds it automatically after source changes.
-- `npm start` is **isolated development mode**: it uses a separate `work/development` configuration and data directory and never touches the DSH / ZCode configuration and model permissions you actually use. For real use, install the matching integration from the settings page.
+- `npm start` is **isolated development mode**: it uses a separate `work/development` configuration and data directory and never touches the DSH / ZCode / Claude Code / Codex configuration and model permissions you actually use. For real use, install the matching integration from the settings page.
 
 > [!TIP]
 > **Requirements**: Windows 10 / 11 (x64), Node.js 24 (npm included), Electron (exact version pinned by `package.json`), and a `csc.exe` able to build the pipe helper.
@@ -133,10 +136,56 @@ The plugin writes to the DSH configuration in a managed way. Uninstalling is a s
 
 </details>
 
+### Claude Code · hook configuration
+
+1. Make sure the Claude Code card is clickable and choose **Install / Repair** (安装 / 修复).
+2. Installation writes the hooks added by this integration into the Claude Code user configuration (`~/.claude/settings.json`, honoring `CLAUDE_CONFIG_DIR`): it backs up first and only touches the entries this integration owns; your existing hooks (notifications, status line, etc.) stay untouched.
+3. Start a new Claude Code session for it to take effect: session status, permission approvals, and `AskUserQuestion` prompts then appear on the island.
+4. To remove it, click **Uninstall integration** (卸载集成); only the hook entries added by this integration are removed.
+
+<details>
+<summary><b>Claude Code compatibility, fallback, and conflict notes</b></summary>
+
+<br />
+
+- Hook scripts are executed by `node`, so make sure Node.js is on your PATH (on Windows the command runs through Git Bash; Claude Code reports a clear error when it is missing).
+- While an approval card is open, the native Claude Code command waits for the decision on the island. If Island HUD exits or stops responding for a long time, it falls back to the native approval and the session never hangs. Approval / question cards can wait for up to 24 hours.
+- Read-only tools (Read / Glob / Grep, etc.) and `bypassPermissions` mode are not proxied and behave exactly as native.
+- `AskUserQuestion` answers are returned through `PreToolUse` `updatedInput` (keyed by both question text and header); on failure it falls back to the native question UI.
+- If you also run another hook that blocks on `PermissionRequest` (such as another approval bridge), both will wait for a response. The settings page reports the conflict — disable one of them as needed.
+- If `disableAllHooks: true` is set, no hooks run at all; the settings page shows a warning.
+
+</details>
+
+### Codex · hook configuration
+
+1. Make sure the Codex card is clickable and choose **Install / Repair** (安装 / 修复).
+2. Installation writes the hooks added by this integration into the Codex configuration (`~/.codex/hooks.json`, honoring `CODEX_HOME`): it backs up first and only touches the entries this integration owns; data written by other tools stays untouched.
+3. **Run `/hooks` once inside Codex to trust this integration**, otherwise the hooks will not execute.
+4. Start a new interactive (TUI) session for it to take effect: session status and permission approvals then appear on the island.
+5. To remove it, click **Uninstall integration** (卸载集成); only the hook entries added by this integration are removed.
+
+<details>
+<summary><b>Codex compatibility, fallback, and known limitations</b></summary>
+
+<br />
+
+- Hook scripts are executed by `node`, so make sure Node.js is on your PATH; on Windows the command runs through cmd and paths with spaces are quoted.
+- **Approval cards only appear in interactive (TUI) sessions**: `codex exec` forces `approval_policy=never` (the sandbox allows or denies at the OS level) and never produces approval events; Codex Desktop / VS Code extension hook dispatch is a known upstream defect. Session status and completion alerts are unaffected.
+- While an approval card is open, the native Codex command waits for the decision on the island. If Island HUD exits or stops responding for a long time, it falls back to the native approval. Approval cards can wait for up to 6 hours.
+- Read-only tools and `bypassPermissions` mode are not proxied and behave exactly as native. Codex has no AskUserQuestion equivalent, so question cards are not supported.
+- If you also run another hook that blocks on `PermissionRequest`, both will wait for a response. The settings page reports the conflict — disable one of them as needed.
+
+</details>
+
+### ChatGPT desktop · not supported
+
+The ChatGPT desktop app (Windows) exposes no official local integration surface (no hooks, no automation API), so a third-party app cannot mirror its status or answer approvals on its behalf. The integratable OpenAI entity is the **Codex CLI** (covered above).
+
 ## How it works and privacy
 
 ```text
-DSH plugin (native plugin) / ZCode (hook configuration)
+DSH plugin (native plugin) / ZCode / Claude Code / Codex (hook configuration)
         │  listens on 127.0.0.1 only, fresh one-time token per launch
         ▼
 Island HUD  ──▶  top island · settings page · tray · global hotkeys
@@ -198,7 +247,7 @@ No. Archive and delete only affect what the island shows: records stay on this m
 <details>
 <summary><b>Are macOS / Linux, Claude Code, or other clients supported?</b></summary>
 
-Only DSH and ZCode on Windows 10 / 11 are supported today. Other systems and clients are out of scope, with no roadmap commitment.
+Only DSH, ZCode, Claude Code, and Codex CLI on Windows 10 / 11 are supported today. Other systems and clients are out of scope, with no roadmap commitment.
 </details>
 
 ## Known limitations
@@ -238,7 +287,7 @@ island-hud/
 ├─ src/
 │  ├─ main.js              Electron main process: windows, tray, island, global hotkeys
 │  ├─ preload.js           Controlled bridge between renderer and main processes
-│  ├─ app/                 App lifecycle, settings, DSH and ZCode integration management
+│  ├─ app/                 App lifecycle, settings, DSH / ZCode / Claude / Codex integration management
 │  ├─ bridge/              Local loopback service that receives and returns integration requests
 │  ├─ dsh/                 DSH adapter layer, session management and navigation
 │  ├─ integrations/        Build inputs for the DSH plugin package and ZCode hook

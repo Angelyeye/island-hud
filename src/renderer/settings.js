@@ -22,7 +22,7 @@
     for (const key of fields) { const el = $(key), item = value[key] ?? P.DEFAULTS[key] ?? false; if (el.type === 'checkbox') el.checked = !!item; else el.value = item; }
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
-    updateDsh(value.dsh); updateZcode(value.zcode); updateClaude(value.claude); preview();
+    updateDsh(value.dsh); updateZcode(value.zcode); updateClaude(value.claude); updateCodex(value.codex); preview();
   }
   function updateDsh(value) {
     if (!value) return;
@@ -44,6 +44,13 @@
     $('claudeStatus').className = 'badge' + (value.connected ? ' ok' : '');
     $('claudeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('claudeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  function updateCodex(value) {
+    if (!value) return;
+    $('codexStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
+    $('codexStatus').className = 'badge' + (value.connected ? ' ok' : '');
+    $('codexReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
+    $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
   }
   const hiddenTargets = {
     archive: { list: 'archiveList', count: 'archiveCount', restoreAll: 'archiveRestoreAll', empty: '没有归档的会话', label: '归档' },
@@ -127,6 +134,16 @@
     } catch (error) { $('claudeOutput').textContent = error.message; status('Claude Code 集成操作失败', true); }
     finally { busy = false; $('claudeInstall').disabled = $('claudeRemove').disabled = false; }
   }
+  async function manageCodex(action) {
+    if (busy) return; busy = true; $('codexInstall').disabled = $('codexRemove').disabled = true;
+    $('codexOutput').textContent = action === 'remove' ? '正在卸载集成…' : '正在写入 Codex hook 配置…';
+    try {
+      const result = await api.codexManage(action); updateCodex(result);
+      $('codexOutput').textContent = result.summary + (result.backupDir ? '\n备份：' + result.backupDir : '');
+      status(action === 'remove' ? 'Codex 集成卸载完成' : 'Codex 集成配置完成');
+    } catch (error) { $('codexOutput').textContent = error.message; status('Codex 集成操作失败', true); }
+    finally { busy = false; $('codexInstall').disabled = $('codexRemove').disabled = false; }
+  }
   for (const button of document.querySelectorAll('[data-tab]')) button.addEventListener('click', () => {
     for (const tab of document.querySelectorAll('[data-tab]')) tab.classList.toggle('selected', tab === button);
     for (const page of document.querySelectorAll('[data-page]')) page.hidden = page.dataset.page !== button.dataset.tab;
@@ -140,6 +157,7 @@
   $('dshInstall').addEventListener('click', () => manageDsh('install')); $('dshRemove').addEventListener('click', () => manageDsh('remove'));
   $('zcodeInstall').addEventListener('click', () => manageZcode('install')); $('zcodeRemove').addEventListener('click', () => manageZcode('remove'));
   $('claudeInstall').addEventListener('click', () => manageClaude('install')); $('claudeRemove').addEventListener('click', () => manageClaude('remove'));
+  $('codexInstall').addEventListener('click', () => manageCodex('install')); $('codexRemove').addEventListener('click', () => manageCodex('remove'));
   $('openLogs').addEventListener('click', () => api.openLogs());
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
@@ -162,6 +180,7 @@
     api.dshStatus().then(updateDsh).catch(() => {});
     api.zcodeStatus?.().then(updateZcode).catch(() => {});
     api.claudeStatus?.().then(updateClaude).catch(() => {});
+    api.codexStatus?.().then(updateCodex).catch(() => {});
   }, 5000);
   window.addEventListener('pagehide', () => { clearInterval(timer); for (const dispose of disposers) dispose?.(); }, { once: true });
 })();

@@ -91,6 +91,7 @@
     dsh: { chip: 'DSH', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
     zcode: { chip: 'ZCode', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
     claude: { chip: 'Claude', title: 'Claude Code 会话', subtitle: 'Claude Code', focus: '在 Claude Code 中', view: '在 Claude Code 查看' },
+    codex: { chip: 'Codex', title: 'Codex 会话', subtitle: 'OpenAI Codex', focus: '在 Codex 中', view: '在 Codex 查看' },
   };
   const meta = provider => providers[provider] || { chip: provider ? String(provider).toUpperCase() : 'HUD', title: '会话', subtitle: provider || '', focus: '在客户端', view: '在客户端查看' };
   function wave(phase = 'idle') {

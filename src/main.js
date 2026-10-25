@@ -21,6 +21,7 @@ const { SessionStore } = require('./sessions/session-store.cjs');
 const { DshIntegrationManager } = require('./app/dsh-integration-manager.cjs');
 const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs');
 const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
+const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -122,11 +123,22 @@ function createClaudeIntegration() {
     log: diag,
   });
 }
+function createCodexIntegration() {
+  return new CodexIntegrationManager({
+    configPath: TEST_ROOT ? path.join(TEST_ROOT, 'codex/hooks.json')
+      : path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'hooks.json'),
+    dataDir: DATA_DIR,
+    sourceDir: path.join(__dirname, '../integrations/codex'),
+    descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
+    log: diag,
+  });
+}
 if (process.argv.includes('--uninstall-cleanup')) {
   try {
     createDshIntegration().remove();
     createZcodeIntegration().remove();
     createClaudeIntegration().remove();
+    createCodexIntegration().remove();
     if (!TEST_ROOT) {
       const ownStartup = app.getLoginItemSettings({ path: process.execPath, name: 'Island HUD' });
       if (ownStartup.launchItems?.some(item => item.path?.toLowerCase() === process.execPath.toLowerCase())) {
@@ -752,6 +764,7 @@ function pipeHelperPath() {
 const dshIntegration = createDshIntegration({ timedQuestions: settings.dshTimedQuestions === true });
 const zcodeIntegration = createZcodeIntegration();
 const claudeIntegration = createClaudeIntegration();
+const codexIntegration = createCodexIntegration();
 
 /* ----------------------------------------------------------------- diagnostics */
 function buildDiagnostics() {
@@ -795,6 +808,7 @@ function settingsPayload() {
     dsh: dshIntegration.status(),
     zcode: zcodeIntegration.status(),
     claude: claudeIntegration.status(),
+    codex: codexIntegration.status(),
     displays: screen.getAllDisplays().length,
     autoStart: !TEST_ROOT && app.isPackaged ? loginItemState() : false,
   };
@@ -837,11 +851,11 @@ function openSettingsWindow() {
 
 // The installed DSH public protocol only focuses its application. Until a
 // precise session route is verified, report that limit without opening another session.
-// ZCode and Claude Code expose no per-session deep link either; surface the project directory.
+// ZCode, Claude Code and Codex expose no per-session deep link either; surface the project directory.
 ipcMain.handle('island:focus', async (_event, id) => {
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
-  if (session.provider === 'zcode' || session.provider === 'claude') {
+  if (['zcode', 'claude', 'codex'].includes(session.provider)) {
     const dir = typeof session.cwd === 'string' ? session.cwd : '';
     if (!dir) return { status: 'unsupported', sessionId: session.rawId, reason: '该会话未提供项目目录' };
     const opened = await shell.openPath(dir);
@@ -921,6 +935,13 @@ ipcMain.handle('island:claude:manage', (event, action) => {
   if (action === 'install' || action === 'repair') return claudeIntegration.install();
   if (action === 'remove') return claudeIntegration.remove();
   throw new Error('未知的 Claude Code 集成操作');
+});
+ipcMain.handle('island:codex:status', () => codexIntegration.status());
+ipcMain.handle('island:codex:manage', (event, action) => {
+  if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Codex 集成管理只能从设置窗口操作');
+  if (action === 'install' || action === 'repair') return codexIntegration.install();
+  if (action === 'remove') return codexIntegration.remove();
+  throw new Error('未知的 Codex 集成操作');
 });
 ipcMain.handle('island:settings:set', (event, patch = {}) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('设置只能从设置窗口保存');
@@ -1085,11 +1106,11 @@ app.whenReady().then(() => {
   };
   publishSessionsNow = publishSessions;
   integrationHub = new IntegrationHub({
-    allowedProviders: ['dsh', 'zcode', 'claude'],
+    allowedProviders: ['dsh', 'zcode', 'claude', 'codex'],
     descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
     helperPath: pipeHelperPath(), log: nativeLog,
     onChange: requests => {
-      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); claudeIntegration.observe(request); }
+      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); claudeIntegration.observe(request); codexIntegration.observe(request); }
       sessionStore.setRequests(requests);
       if (win && !win.isDestroyed()) win.webContents.send('island:native:requests', requests);
       publishSessions();
@@ -1098,6 +1119,7 @@ app.whenReady().then(() => {
       dshIntegration.observe(request);
       zcodeIntegration.observe(request);
       claudeIntegration.observe(request);
+      codexIntegration.observe(request);
       sessionStore.applyEvent(request);
       const { event, requestId, outcome } = request.payload;
       if (requestId && ['ApprovalDecided', 'QuestionAnswered'].includes(event) && win && !win.isDestroyed()) {

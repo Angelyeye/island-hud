@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 
-const PROVIDERS = new Set(['dsh', 'zcode', 'claude']);
+const PROVIDERS = new Set(['dsh', 'zcode', 'claude', 'codex']);
 const KINDS = new Set(['archived', 'deleted']);
 const DEFAULT_KIND = 'archived';
 const VERSION = 2;

@@ -37,7 +37,7 @@ test('invalid persisted entries are ignored while valid ones are kept', t => {
   fs.writeFileSync(file, JSON.stringify({ v: VERSION, entries: [
     { key: keyOf('dsh', 'ok'), provider: 'dsh', rawId: 'ok', title: 'ok', archivedAt: Date.now() },
     { key: keyOf('dsh', 'mismatch'), provider: 'dsh', rawId: 'other', archivedAt: Date.now() },
-    { key: '["claude","x"]', provider: 'claude', rawId: 'x', archivedAt: Date.now() },
+    { key: '["gemini","x"]', provider: 'gemini', rawId: 'x', archivedAt: Date.now() },
     { key: keyOf('dsh', 'bad-time'), provider: 'dsh', rawId: 'bad-time', archivedAt: 'soon' },
     { key: '', provider: 'dsh', rawId: '', archivedAt: Date.now() },
   ] }));

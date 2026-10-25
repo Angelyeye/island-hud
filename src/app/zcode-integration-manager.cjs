@@ -27,6 +27,11 @@ class ZcodeIntegrationManager {
     Object.assign(this, { configPath, dataDir, sourceDir, descriptorPath, now, hooks, log });
     this.home = path.join(dataDir, 'integrations/zcode');
     this.stateFile = path.join(this.home, 'state.json');
+    // Ownership marker is the version-independent packages directory: upgrades
+    // change the content-addressed leaf, so exact-path matching would strand
+    // old hook groups in config.json after every upgrade.
+    this.ownedMarker = JSON.stringify(path.join(dataDir, 'integrations', 'zcode', 'packages')).toLowerCase().slice(1, -1);
+    this.ownedScript = 'island-hook.mjs';
     this.lastSeen = 0; this.hostVersion = null;
   }
   observe(envelope) {
@@ -44,23 +49,23 @@ class ZcodeIntegrationManager {
     }
     return { bytes, value };
   }
-  isOwnedEntry(entry, scriptPath) {
+  isOwnedEntry(entry) {
     if (!object(entry)) return false;
-    // JSON.stringify escapes backslashes, so compare against the escaped path form.
-    const needle = JSON.stringify(scriptPath).toLowerCase().slice(1, -1);
-    return JSON.stringify(entry).toLowerCase().includes(needle);
+    // JSON.stringify escapes backslashes, so the marker is compared in its escaped form.
+    const text = JSON.stringify(entry).toLowerCase();
+    return text.includes(this.ownedMarker) && text.includes(this.ownedScript);
   }
-  ownedGroups(config, scriptPath, event) {
+  ownedGroups(config, event) {
     const groups = config?.hooks?.events?.[event];
     return Array.isArray(groups) ? groups.filter(group => object(group) &&
-      Array.isArray(group.hooks) && group.hooks.some(entry => this.isOwnedEntry(entry, scriptPath))) : [];
+      Array.isArray(group.hooks) && group.hooks.some(entry => this.isOwnedEntry(entry))) : [];
   }
   /** Blocking PermissionRequest hooks from other tools (e.g. agent bridges) coexist on the same event. */
-  detectConflict(config, scriptPath) {
+  detectConflict(config) {
     const groups = config?.hooks?.events?.PermissionRequest;
     if (!Array.isArray(groups)) return '';
     const others = groups.filter(group => object(group) && Array.isArray(group.hooks) &&
-      group.hooks.length && !group.hooks.every(entry => this.isOwnedEntry(entry, scriptPath)));
+      group.hooks.length && !group.hooks.every(entry => this.isOwnedEntry(entry)));
     if (!others.length) return '';
     const first = others[0].hooks.find(entry => entry && (entry.command || entry.type));
     const name = first ? String(first.command || first.type) : '未知命令';
@@ -92,10 +97,10 @@ class ZcodeIntegrationManager {
       }
       const { value } = this.readConfig();
       config = value;
-      base.installed = !!scriptPath && EVENT_HOOKS.every(event => this.ownedGroups(config, scriptPath, event).length) &&
-        this.ownedGroups(config, scriptPath, 'PermissionRequest').length > 0;
+      base.installed = !!scriptPath && EVENT_HOOKS.every(event => this.ownedGroups(config, event).length) &&
+        this.ownedGroups(config, 'PermissionRequest').length > 0;
       base.managed = base.installed && !!state;
-      base.conflict = this.detectConflict(config, scriptPath || '\u0000');
+      base.conflict = this.detectConflict(config);
       base.connected = base.installed && this.lastSeen > 0 && this.now() - this.lastSeen < 45000;
       base.hostVersion = this.hostVersion;
       if (!base.installed && (state || (scriptPath && JSON.stringify(config).toLowerCase().includes(scriptPath.toLowerCase())))) {
@@ -173,15 +178,24 @@ class ZcodeIntegrationManager {
       let added = 0;
       for (const [event, group] of this.hookEntries(scriptPath)) {
         if (!Array.isArray(next.hooks.events[event])) { next.hooks.events[event] = []; createdEvents.push(event); }
-        const exists = this.ownedGroups(next, scriptPath, event).some(existing =>
-          JSON.stringify(existing) === JSON.stringify(group));
-        if (!exists) { next.hooks.events[event].push(group); added++; }
+        // An upgrade leaves groups pointing at the previous content-addressed
+        // bundle; replace every owned group that is not the current one.
+        const owned = next.hooks.events[event].filter(g => object(g) && Array.isArray(g.hooks) &&
+          g.hooks.some(entry => this.isOwnedEntry(entry)));
+        const hasCurrent = owned.some(existing => JSON.stringify(existing) === JSON.stringify(group));
+        const stale = owned.filter(existing => JSON.stringify(existing) !== JSON.stringify(group));
+        if (stale.length) {
+          const staleTexts = new Set(stale.map(existing => JSON.stringify(existing)));
+          next.hooks.events[event] = next.hooks.events[event].filter(existing => !staleTexts.has(JSON.stringify(existing)));
+          added++;
+        }
+        if (!hasCurrent) { next.hooks.events[event].push(group); added++; }
       }
       if (!added) {
         const state = this.state();
         if (state?.target === bundle.target) return { ...this.status(), changed: false, summary: 'ZCode 集成配置完整，无需重复安装' };
       }
-      const conflict = this.detectConflict(next, scriptPath);
+      const conflict = this.detectConflict(next);
       const backupDir = this.writeConfig(before, next, 'install');
       const state = { owner: OWNER, configPath: this.configPath, target: bundle.target, version: bundle.version, scaffold: { ...scaffold, createdEvents }, backupDir };
       atomic(this.stateFile, encoded(state));
@@ -201,7 +215,7 @@ class ZcodeIntegrationManager {
         const groups = next.hooks?.events?.[event];
         if (!Array.isArray(groups)) continue;
         next.hooks.events[event] = groups.filter(group => !(object(group) && Array.isArray(group.hooks) &&
-          group.hooks.some(entry => this.isOwnedEntry(entry, scriptPath))));
+          group.hooks.some(entry => this.isOwnedEntry(entry))));
         const deletable = state.scaffold?.events || (state.scaffold?.createdEvents || []).includes(event);
         if (deletable && !next.hooks.events[event].length) delete next.hooks.events[event];
       }

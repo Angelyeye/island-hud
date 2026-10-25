@@ -30,6 +30,7 @@ async function main() {
     filter: source => !omitted.has(path.basename(source)) && path.basename(source) !== 'probe' });
   fs.cpSync(path.join(root, 'integrations/dsh'), path.join(appRoot, 'integrations/dsh'), { recursive: true });
   fs.cpSync(path.join(root, 'integrations/zcode'), path.join(appRoot, 'integrations/zcode'), { recursive: true });
+  fs.cpSync(path.join(root, 'integrations/claude'), path.join(appRoot, 'integrations/claude'), { recursive: true });
   fs.cpSync(path.join(root, 'node_modules/fzstd'), path.join(appRoot, 'node_modules/fzstd'), { recursive: true });
   fs.writeFileSync(path.join(appRoot, 'package.json'), JSON.stringify({ name: 'island-hud', productName: 'Island HUD', version,
     description: metadata.description, author: 'Angelyeye', main: 'src/main.js', type: 'commonjs', dependencies: { fzstd: '0.1.1' } }, null, 2));
@@ -38,7 +39,7 @@ async function main() {
     fs.copyFileSync(path.join(root, name), path.join(portable, name));
     fs.copyFileSync(path.join(root, name), path.join(appRoot, name));
   }
-  const status = { version, kind: 'experimental-candidate', stable: false, providers: ['dsh', 'zcode'], electron: actual,
+  const status = { version, kind: 'experimental-candidate', stable: false, providers: ['dsh', 'zcode', 'claude'], electron: actual,
     verification: 'Protocol and GUI checks do not replace real-client verification; see README for known limitations' };
   status.sourceCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim();
   status.sourceDirty = !!execFileSync('git', ['status', '--porcelain'], { cwd: root, encoding: 'utf8', windowsHide: true }).trim();

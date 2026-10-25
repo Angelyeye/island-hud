@@ -12,7 +12,8 @@ if (version !== declared) throw new Error(`Preserved Electron ${declared} runtim
 const out = path.resolve(process.argv[2] || path.join(root, 'work/ui-tests', randomUUID()));
 fs.mkdirSync(out, { recursive: true });
 const cases = [['electron-runner.cjs', 'electron-test-result.json'], ['windows-input-runner.cjs', 'windows-input-result.json'],
-  ['renderer-runner.cjs', 'renderer-result.json'], ['application-runner.cjs', 'application-result.json'],
+  ['providers-runner.cjs', 'providers-result.json'], ['renderer-runner.cjs', 'renderer-result.json'],
+  ['application-runner.cjs', 'application-result.json'],
   ['visual-runner.cjs', 'visual-result.json'], ['upgrade-runner.cjs', 'upgrade-result.json']];
 const reports = [];
 for (const [runner, reportName] of cases) {

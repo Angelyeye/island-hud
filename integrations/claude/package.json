@@ -1,0 +1,14 @@
+{
+  "name": "@island-hud/claude-bridge",
+  "version": "0.1.0",
+  "description": "Island HUD bridge for Claude Code hooks: session events, approval and question relay",
+  "main": "scripts/island-hook.cjs",
+  "files": [
+    "scripts/island-hook.cjs",
+    "lib/client.cjs",
+    "lib/contract.cjs"
+  ],
+  "islandHud": {
+    "owner": "island-hud-claude-integration-v1"
+  }
+}

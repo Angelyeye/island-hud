@@ -30,7 +30,7 @@ class ZcodeIntegrationManager {
     // Ownership marker is the version-independent packages directory: upgrades
     // change the content-addressed leaf, so exact-path matching would strand
     // old hook groups in config.json after every upgrade.
-    this.ownedMarker = JSON.stringify(path.join(dataDir, 'integrations', 'zcode', 'packages')).toLowerCase().slice(1, -1);
+    this.ownedMarker = JSON.stringify(path.join(dataDir, 'integrations', 'zcode', 'packages')).toLowerCase().slice(1, -1).replace(/\\\\/g, '/');
     this.ownedScript = 'island-hook.mjs';
     this.lastSeen = 0; this.hostVersion = null;
   }
@@ -52,7 +52,7 @@ class ZcodeIntegrationManager {
   isOwnedEntry(entry) {
     if (!object(entry)) return false;
     // JSON.stringify escapes backslashes, so the marker is compared in its escaped form.
-    const text = JSON.stringify(entry).toLowerCase();
+    const text = JSON.stringify(entry).toLowerCase().replace(/\\\\/g, '/');
     return text.includes(this.ownedMarker) && text.includes(this.ownedScript);
   }
   ownedGroups(config, event) {

@@ -155,7 +155,22 @@ app.whenReady().then(async () => {
     await until(async () => (await snapshot()).length === 0);
     checks.push('claude AskUserQuestion answered by real clicks maps the option onto question and header keys');
 
-    // 4. ZCode approval decided on the shared island (provider isolation after the refactor).
+    // 4. Codex approval decided on the shared island (provider isolation).
+    const codexHook = path.join(__dirname, '../integrations/codex/scripts/island-hook.cjs');
+    const codexAllow = runHookScript(codexHook, {
+      hook_event_name: 'PermissionRequest', session_id: 'providers-codex-1', cwd: 'C:\\work\\providers-demo',
+      permission_mode: 'default', tool_name: 'Bash', tool_input: { command: 'cargo build', description: 'build the workspace' },
+    });
+    await until(async () => !!pendingOf(await snapshot(), 'codex', 'approval'));
+    await until(() => win.webContents.executeJavaScript('[...document.querySelectorAll(".source-chip")].some(el => el.textContent === "Codex")'));
+    await clickNativeAction('allow');
+    const codexOut = await Promise.race([codexAllow, pause(4000).then(() => ({ out: '', err: 'timeout' }))]);
+    assert.equal(codexOut.code, 0);
+    assert.equal(JSON.parse(codexOut.out).hookSpecificOutput.decision.behavior, 'allow');
+    await until(async () => (await snapshot()).length === 0);
+    checks.push('codex approval allow decided by a real Windows click returns behavior=allow to the hook');
+
+    // 5. ZCode approval decided on the shared island (provider isolation after the refactor).
     const zcodeDeny = runHookScript(zcodeHook, {
       hook_event_name: 'PermissionRequest', session_id: 'providers-zcode-1', cwd: 'C:\\work\\providers-demo',
       tool_name: 'Bash', tool_input: { command: 'git push --force' },

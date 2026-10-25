@@ -1,0 +1,14 @@
+{
+  "name": "@island-hud/codex-bridge",
+  "version": "0.1.0",
+  "description": "Island HUD bridge for OpenAI Codex hooks: session events and approval relay",
+  "main": "scripts/island-hook.cjs",
+  "files": [
+    "scripts/island-hook.cjs",
+    "lib/client.cjs",
+    "lib/contract.cjs"
+  ],
+  "islandHud": {
+    "owner": "island-hud-codex-integration-v1"
+  }
+}

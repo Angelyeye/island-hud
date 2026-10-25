@@ -11,7 +11,7 @@ const checks = [], frames = [], errors = [];
 app.whenReady().then(async () => {
   const win = new BrowserWindow({ width: 568, height: 624, frame: false, transparent: true, show: false, focusable: false,
     webPreferences: { contextIsolation: true, nodeIntegration: false } });
-  win.webContents.on('console-message', (_e, level, message) => { if (level >= 3) errors.push(message); });
+  win.webContents.on('console-message', details => { if (details.level === 'error') errors.push(details.message); });
   const js = source => win.webContents.executeJavaScript(source);
   try {
     await win.loadFile(path.resolve(__dirname, '../src/renderer/index.html'), { query: { demo: '1' } });

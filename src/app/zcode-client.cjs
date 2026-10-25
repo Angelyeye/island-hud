@@ -26,9 +26,13 @@ function clientPath({ platform = process.platform, env = process.env, exists = f
 }
 
 /** Fire-and-forget launch: a slow or missing client must never block focus, and
- * async spawn errors are swallowed because the caller has nothing to show. */
-function openWorkspace(exe, dir, { platform = process.platform, spawnFn = spawn } = {}) {
+ * async spawn errors are swallowed because the caller has nothing to show.
+ * The workspace must be an existing directory — session cwd values come from
+ * provider logs, and a stale or tampered one pointing at a file must never
+ * reach a launcher's argv. */
+function openWorkspace(exe, dir, { platform = process.platform, spawnFn = spawn, statFn = fs.statSync } = {}) {
   try {
+    if (!statFn(dir, { throwIfNoEntry: false })?.isDirectory()) return false;
     const args = platform === 'darwin' ? ['zcode://workspace/open?path=' + encodeURIComponent(dir)] : [dir];
     const child = spawnFn(exe, args, { detached: true, stdio: 'ignore', windowsHide: platform === 'win32' });
     child.on?.('error', () => {});

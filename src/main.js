@@ -467,9 +467,12 @@ function createWindow() {
     }
   });
   win.webContents.on('render-process-gone', (_e, d) => diag('render-process-gone ' + JSON.stringify(d)));
-  win.webContents.on('console-message', (_e, level, msg) => {
-    const text = String(msg);
-    if (level >= 2 || text.startsWith('HUD_')) diag('renderer[' + level + '] ' + text.slice(0, 300));
+  // Electron >= 34 carries the message on the event itself and keeps the
+  // positional (level, message, …) arguments only as a deprecated legacy that
+  // a future major removes; read the event so renderer logging survives it.
+  win.webContents.on('console-message', (details) => {
+    const text = String(details.message);
+    if (details.level === 'warning' || details.level === 'error' || text.startsWith('HUD_')) diag('renderer[' + details.level + '] ' + text.slice(0, 300));
   });
   win.once('ready-to-show', () => { if (!IDLE_MONITOR) { win.showInactive(); diag('shown'); } else diag('isolated idle monitor: window stays hidden'); publishEnvironment(); });
   win.on('show', publishEnvironment);
@@ -847,6 +850,10 @@ function openSettingsWindow() {
     },
   });
   settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  // Same lock-down as the island window (see createWindow): a local page that
+  // must never open windows or navigate away from its bundled origin.
+  settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  settingsWin.webContents.on('will-navigate', event => event.preventDefault());
   settingsWin.once('ready-to-show', () => {
     if (!settingsWin || settingsWin.isDestroyed()) return;
     settingsWin.show();
@@ -861,13 +868,22 @@ function openSettingsWindow() {
 // hands that workspace to the running window and focuses it. Without an
 // installed client — and for Claude Code/Codex, which have no desktop client at
 // all — surface the project directory.
+// A session cwd arrives from provider log files, so every launch path here
+// (ZCode relaunch and the openPath fallback) goes through one gate: it must be
+// an existing directory — a tampered cwd pointing at a file must never reach
+// ShellExecute, which would hand it to its default handler.
+function existingDirectory(value) {
+  try { return fs.statSync(value, { throwIfNoEntry: false })?.isDirectory() ? value : ''; } catch { return ''; }
+}
+
 ipcMain.handle('island:focus', async (_event, id) => {
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
   const dir = typeof session.cwd === 'string' ? session.cwd : '';
+  const workspace = existingDirectory(dir);
   if (session.provider === 'zcode') {
-    const client = dir ? zcodeClientPath() : null;
-    if (client && zcodeOpenWorkspace(client, dir)) return { status: 'navigated', sessionId: session.rawId };
+    const client = workspace ? zcodeClientPath() : null;
+    if (client && zcodeOpenWorkspace(client, workspace)) return { status: 'navigated', sessionId: session.rawId };
   } else if (!['claude', 'codex'].includes(session.provider)) {
     if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
       reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
@@ -880,7 +896,8 @@ ipcMain.handle('island:focus', async (_event, id) => {
         reason: result.status === 'expired' ? '目标会话已失效' : 'DSH 精确导航插件未连接，请在客户端手动打开' };
   }
   if (!dir) return { status: 'unsupported', sessionId: session.rawId, reason: '该会话未提供项目目录' };
-  const opened = await shell.openPath(dir);
+  if (!workspace) return { status: 'unsupported', sessionId: session.rawId, reason: '该项目目录已不存在或不是目录' };
+  const opened = await shell.openPath(workspace);
   return opened ? { status: 'unsupported', sessionId: session.rawId, reason: opened }
     : { status: 'navigated', sessionId: session.rawId };
 });

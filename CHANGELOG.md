@@ -8,6 +8,13 @@
 
 - **ZCode 审批卡新增「始终允许」**：对带规则主体字段的工具（Bash 命令、文件路径、URL 等）可直接在岛上选择始终允许。hook 由此返回 ZCode `PermissionRequest` 决策的 `permissionUpdates`（`addRules`/`allow` 规则），与会话原生「始终允许此命令」同一持久化机制，后续相同命令不再询问。按钮仅对 ZCode 会话且 hook 上报了规则主体时显示（bridge 升级到 0.2.0，需在设置页对集成执行「修复」后生效）；无主体字段的工具与「完全访问」这类客户端权限模式切换仍走「返回客户端」由原生界面决策。
 
+### 修复
+
+- 渲染进程控制台日志监听迁移到 Electron 34+ 的事件参数形态（`details.level` / `details.message`）：此前使用的 `(level, message, …)` 位置参数已被官方弃用并将在未来大版本移除，届时渲染层错误与 `HUD_` 诊断日志通道会静默失效；主进程与两个 GUI 测试 runner（renderer / visual）同步迁移，事件形态已用本机 Electron 42.11.16 运行时探针核实（参数直接平铺在事件对象上，`level` 为字符串枚举）。
+- 设置窗口补齐与主窗口一致的防护：`window.open` 一律拒绝、`will-navigate` 一律拦截。设置页加载的是本地打包页面且渲染层无 Node 访问，此为纵深防御对齐（主窗口此前已有、设置窗口缺失）。
+- 点击会话「拉起客户端 / 打开项目目录」前统一校验会话 `cwd` 必须是**已存在的目录**：`cwd` 取自各 provider 的日志文件，此前若被篡改为指向某个文件（如 `.exe`），`shell.openPath` 会经 ShellExecute 用默认处理器打开它。现 `island:focus` 与 ZCode 客户端拉起（`src/app/zcode-client.cjs`）双层校验，非目录或不存在的路径返回「项目目录已不存在或不是目录」提示。新增 zcode-client 单元测试。
+- 更新源 URL 在发起请求前校验：仅允许 `https://`，且拒绝 `localhost`、`.local`/`.internal`、环回、私网、链路本地、ULA 及组播等本机与内网地址。`updateUrl` 为用户手填配置，填错或被篡改时不再可能让应用向本机或内网地址发起「更新清单」请求（清单文本本就只用于对话框展示、从不下载执行安装器，此为收口加固）。新增 updater 单元测试。
+
 ## [0.3.1] - 2026-10-26
 
 ### 修复

@@ -102,6 +102,16 @@ async function claudeScenario(sandbox) {
     ['-p', '你必须使用 Bash 工具（不要用 Write 或其他工具）运行命令：echo island-e2e-ok > island-e2e.txt 然后读取 island-e2e.txt 告诉我内容'],
     { cwd: workDir, env: { ...process.env, CLAUDE_CONFIG_DIR: configDir } });
   await approver;
+  // The file being created proves claude executed the command; require the
+  // hub's own evidence log to confirm the approval actually flowed through
+  // the island (request + decision), not around it.
+  const evidence = path.join(root, 'bridge-evidence.jsonl');
+  await until(() => {
+    try {
+      const log = fs.readFileSync(evidence, 'utf8');
+      return log.includes('provider=claude') && log.includes('event=ApprovalDecided') && log.includes('status=delivered');
+    } catch { return false; }
+  }, 15000);
   return { exit: result.code, file: path.join(workDir, 'island-e2e.txt'), output: (result.out || '').slice(-400) };
 }
 
@@ -139,11 +149,12 @@ async function codexScenario(sandbox) {
   let child = null;
   const started = Date.now();
   // codex exec completes the turn but its process can linger on Windows
-  // because hook children inherit the stdio pipes; the turn output itself is
-  // the completion signal, then the runner reaps the process.
+  // because hook children inherit the stdio pipes. "tokens used" is the
+  // real end-of-turn banner (the prompt echo must never count as done —
+  // it contains the prompt text itself), then the runner reaps the process.
   const output = await new Promise(resolve => {
     const check = setInterval(() => {
-      const done = lines.some(l => /成功|tokens used/.test(l));
+      const done = lines.some(l => /tokens used/.test(l));
       if (done || Date.now() - started > 180000) {
         clearInterval(check);
         resolve({ text: lines.join('\n'), ok: done, elapsed: Date.now() - started });
@@ -156,7 +167,16 @@ async function codexScenario(sandbox) {
       line => lines.push(line), c => { child = c; }).catch(() => {});
   });
   console.error('[e2e] codex scenario finished ok=' + output.ok + ' elapsed=' + Math.round(output.elapsed / 1000) + 's');
-  assert.ok(output.ok, 'codex turn never produced its completion output: ' + output.text.slice(-400));
+  assert.ok(output.ok, 'codex turn never completed: ' + output.text.slice(-400));
+  // The turn completing is not enough: its lifecycle hooks must have reached
+  // the island through the real pipe. The hub writes every host event to the
+  // bridge evidence log; require at least one codex event there.
+  const evidence = path.join(root, 'bridge-evidence.jsonl');
+  await until(() => {
+    try {
+      return fs.readFileSync(evidence, 'utf8').includes('provider=codex ');
+    } catch { return false; }
+  }, 15000);
   return { exit: 0, output: output.text.slice(-400) };
 }
 
@@ -171,11 +191,13 @@ app.whenReady().then(async () => {
     await until(() => win && !win.webContents.isLoading() && fs.existsSync(descriptor));
     await until(() => win.webContents.executeJavaScript('!!window.__islandApp'));
     const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'island-hud-e2e-'));
+    const transcript = { claude: '', codex: '' };
     try {
       if (process.env.ISLAND_HUD_E2E_CLAUDE === '1') {
         console.error('[e2e] claude scenario starting');
         const claude = await claudeScenario(sandbox);
         console.error('[e2e] claude scenario finished code=' + claude.exit);
+        transcript.claude = claude.output;
         assert.equal(claude.exit, 0, 'claude exited non-zero: ' + claude.output);
         assert.ok(fs.existsSync(claude.file), 'claude did not create the file; approval never landed: ' + claude.output);
         assert.ok(claude.output.includes('island-e2e-ok'), 'claude output lacks the file content');
@@ -183,6 +205,7 @@ app.whenReady().then(async () => {
       } else skipped.push('claude 未安装或未启用，跳过');
       if (process.env.ISLAND_HUD_E2E_CODEX === '1') {
         const codex = await codexScenario(sandbox);
+        transcript.codex = codex.output;
         assert.equal(codex.exit, 0, 'codex exited non-zero: ' + codex.output);
         assert.ok(/成功/.test(codex.output), 'codex output lacks the expected reply: ' + codex.output);
         checks.push('real codex exec session: lifecycle hooks reached the island and the turn completed');
@@ -192,7 +215,7 @@ app.whenReady().then(async () => {
       try { fs.rmSync(sandbox, { recursive: true, force: true, maxRetries: 6, retryDelay: 400 }); }
       catch (error) { console.error('[e2e] sandbox cleanup skipped: ' + error.message); }
     }
-    writeReport({ status: 'passed', electron: process.versions.electron,
+    writeReport({ status: 'passed', transcript, electron: process.versions.electron,
       note: 'Real CLIs against sandboxed configs; approvals decided by this runner, not by a human.' });
   } catch (error) {
     writeReport({ status: 'failed', error: error.stack,

@@ -2,7 +2,7 @@
   "name": "island-hud",
   "version": "0.2.0",
   "private": true,
-  "description": "A Windows top-of-screen island HUD for DeepSeek Harness (DSH) and ZCode.",
+  "description": "A Windows top-of-screen island HUD for DeepSeek Harness (DSH), ZCode, Claude Code and Codex.",
   "license": "AGPL-3.0-only",
   "author": "Angelyeye",
   "main": "src/main.js",
@@ -30,6 +30,7 @@
     "test": "node --test --test-concurrency=1 test/*.test.cjs",
     "test:ui": "node tools/run-ui-tests.cjs",
     "test:tray": "node tools/run-tray-menu-tests.cjs",
+    "test:e2e": "node tools/run-cli-e2e.cjs",
     "test:all": "npm test && npm run test:ui && npm run test:tray",
     "test:dsh": "node --test --test-concurrency=1 test/dsh-adapter.test.cjs test/dsh-manager.test.cjs test/dsh-navigation.test.cjs test/logs-and-state.test.cjs test/session-store.test.cjs test/settings.test.cjs test/question-drafts.test.cjs",
     "package:dsh": "node tools/package-dsh.cjs"

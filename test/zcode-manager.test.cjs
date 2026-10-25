@@ -62,6 +62,33 @@ test('install is idempotent and reports no change on a second run', async (t) =>
   assert.equal(fs.readFileSync(fx.configPath, 'utf8'), before);
 });
 
+test('an upgraded bundle replaces stale owned groups instead of duplicating them', async (t) => {
+  const fx = await mfixture(t);
+  await fx.manager.install();
+  // Simulate a previous content-addressed bundle: rewrite the deployed script
+  // path everywhere, as an older island-hud version would have left it.
+  const stateFile = path.join(fx.dir, 'integrations/zcode/state.json');
+  const current = deployedScript(fx.dir);
+  const stalePath = current.replace(/packages[\\/]([^\\/-]+)-([0-9a-f]{20})/, 'packages/0.0.9-' + 'a'.repeat(20));
+  let text = fs.readFileSync(fx.configPath, 'utf8').split(JSON.stringify(current).slice(1, -1)).join(JSON.stringify(stalePath).slice(1, -1));
+  fs.writeFileSync(fx.configPath, text);
+  const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
+  state.target = path.dirname(path.dirname(stalePath));
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\n');
+
+  const result = await fx.manager.install();
+  assert.equal(result.changed, true);
+  const reinstalled = fs.readFileSync(fx.configPath, 'utf8');
+  assert.ok(!reinstalled.includes('0.0.9-'), 'stale bundle path should be replaced');
+  const config = fx.read();
+  for (const event of ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'Stop', 'PermissionRequest']) {
+    const entries = (config.hooks?.events?.[event] || [])
+      .filter(group => group.hooks?.some(entry => fx.manager.isOwnedEntry(entry)));
+    assert.equal(entries.length, 1, event + ' should have exactly one owned group');
+    assert.equal(entries[0].hooks[0].args[0], deployedScript(fx.dir));
+  }
+});
+
 test('remove strips only the owned entries and restores scaffolded keys', async (t) => {
   const fx = await mfixture(t);
   await fx.manager.install();

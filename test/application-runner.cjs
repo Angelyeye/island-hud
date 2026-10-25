@@ -22,7 +22,7 @@ app.whenReady().then(async () => {
     assert.equal(app.getPath('userData'), path.join(root, 'electron'));
     assert.equal(win.isFocused(), false); assert.equal(win.getBounds().width, 568);
     checks.push('full application starts with isolated settings, sessions and unchanged non-activating window geometry');
-    const navigation = await js('window.island.focusDsh("missing-session")');
+    const navigation = await js('window.island.focusSession("missing-session")');
     assert.equal(navigation.status, 'expired');
     checks.push('missing target returns an explicit expired result through real preload IPC');
     await assert.rejects(js('window.island.settings.dshManage("install")'), /设置窗口/);

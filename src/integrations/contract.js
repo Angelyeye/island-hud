@@ -1,11 +1,13 @@
 'use strict';
-const PROVIDERS = new Set(['dsh', 'zcode']);
+const PROVIDERS = new Set(['dsh', 'zcode', 'claude']);
 const MAX_FRAME_BYTES = 512 * 1024;
-// ZCode hook clients block the agent's own tool call while the island card is
-// open, so they may legitimately wait far longer than DSH's in-app flow.
+// ZCode and Claude Code hook clients block the agent's own tool call while the
+// island card is open, so they may legitimately wait far longer than DSH's
+// in-app flow.
 const TIMEOUT_MS = {
   dsh: { approval: 120000, question: 600000 },
   zcode: { approval: 24 * 3600000, question: 24 * 3600000 },
+  claude: { approval: 24 * 3600000, question: 24 * 3600000 },
 };
 function timeoutFor(provider, kind) {
   if (kind !== 'approval' && kind !== 'question') return 0;

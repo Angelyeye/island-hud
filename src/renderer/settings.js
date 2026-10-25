@@ -22,7 +22,7 @@
     for (const key of fields) { const el = $(key), item = value[key] ?? P.DEFAULTS[key] ?? false; if (el.type === 'checkbox') el.checked = !!item; else el.value = item; }
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
-    updateDsh(value.dsh); updateZcode(value.zcode); preview();
+    updateDsh(value.dsh); updateZcode(value.zcode); updateClaude(value.claude); preview();
   }
   function updateDsh(value) {
     if (!value) return;
@@ -37,6 +37,13 @@
     $('zcodeStatus').className = 'badge' + (value.connected ? ' ok' : '');
     $('zcodeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('zcodeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  function updateClaude(value) {
+    if (!value) return;
+    $('claudeStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
+    $('claudeStatus').className = 'badge' + (value.connected ? ' ok' : '');
+    $('claudeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
+    $('claudeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
   }
   const hiddenTargets = {
     archive: { list: 'archiveList', count: 'archiveCount', restoreAll: 'archiveRestoreAll', empty: '没有归档的会话', label: '归档' },
@@ -110,6 +117,16 @@
     } catch (error) { $('zcodeOutput').textContent = error.message; status('ZCode 集成操作失败', true); }
     finally { busy = false; $('zcodeInstall').disabled = $('zcodeRemove').disabled = false; }
   }
+  async function manageClaude(action) {
+    if (busy) return; busy = true; $('claudeInstall').disabled = $('claudeRemove').disabled = true;
+    $('claudeOutput').textContent = action === 'remove' ? '正在卸载集成…' : '正在写入 Claude Code hook 配置…';
+    try {
+      const result = await api.claudeManage(action); updateClaude(result);
+      $('claudeOutput').textContent = result.summary + (result.backupDir ? '\n备份：' + result.backupDir : '');
+      status(action === 'remove' ? 'Claude Code 集成卸载完成' : 'Claude Code 集成配置完成');
+    } catch (error) { $('claudeOutput').textContent = error.message; status('Claude Code 集成操作失败', true); }
+    finally { busy = false; $('claudeInstall').disabled = $('claudeRemove').disabled = false; }
+  }
   for (const button of document.querySelectorAll('[data-tab]')) button.addEventListener('click', () => {
     for (const tab of document.querySelectorAll('[data-tab]')) tab.classList.toggle('selected', tab === button);
     for (const page of document.querySelectorAll('[data-page]')) page.hidden = page.dataset.page !== button.dataset.tab;
@@ -122,6 +139,7 @@
   $('save').addEventListener('click', save); $('close').addEventListener('click', () => window.close());
   $('dshInstall').addEventListener('click', () => manageDsh('install')); $('dshRemove').addEventListener('click', () => manageDsh('remove'));
   $('zcodeInstall').addEventListener('click', () => manageZcode('install')); $('zcodeRemove').addEventListener('click', () => manageZcode('remove'));
+  $('claudeInstall').addEventListener('click', () => manageClaude('install')); $('claudeRemove').addEventListener('click', () => manageClaude('remove'));
   $('openLogs').addEventListener('click', () => api.openLogs());
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
@@ -143,6 +161,7 @@
     if (busy || document.visibilityState === 'hidden') return;
     api.dshStatus().then(updateDsh).catch(() => {});
     api.zcodeStatus?.().then(updateZcode).catch(() => {});
+    api.claudeStatus?.().then(updateClaude).catch(() => {});
   }, 5000);
   window.addEventListener('pagehide', () => { clearInterval(timer); for (const dispose of disposers) dispose?.(); }, { once: true });
 })();

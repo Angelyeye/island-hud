@@ -58,7 +58,7 @@
       const full = `来源：${source(request)}\n项目：${cwd || '未提供'}\n请求：${request.requestId}\n会话：${request.sessionId || '未关联（不推断会话）'}`;
       return `<details class="request-meta"><summary>请求详情${!request.sessionId ? ' · 未关联会话' : ''}</summary><pre>${esc(full)}</pre></details>`;
     };
-    const head = request => window.IslandPresentation.header(sessionOf(request) || { title: request.payload.sessionTitle || '当前请求', cwd: request.payload.cwd, phase: request.kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer' }, {
+    const head = request => window.IslandPresentation.header(sessionOf(request) || { provider: request.provider, title: request.payload.sessionTitle || '当前请求', cwd: request.payload.cwd, phase: request.kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer' }, {
       controls: `<button class="collapse-request" data-native-action="collapse" aria-label="收起卡片" title="收起卡片，保留待处理请求">−</button>` }) + `<div class="${request.kind === 'approval' ? 'appr-head' : 'ask-head'} native-head">
       ${request.kind === 'approval' ? '<span class="appr-dot"></span>' : askIcon()}
       <span>${esc(source(request))} · ${request.kind === 'approval' ? '权限请求' : request.blocking === false ? '可继续工作 · 待回答' : '需要回答后继续'}</span>

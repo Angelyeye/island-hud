@@ -805,6 +805,7 @@ function settingsPayload() {
   return {
     ...settings,
     version: app.getVersion(),
+    electronVersion: process.versions.electron,
     packaged: app.isPackaged,
     updateUrl: updateUrl(),
     autoCheckUpdates: settings.autoCheckUpdates !== false,

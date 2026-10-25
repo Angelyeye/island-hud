@@ -23,6 +23,10 @@
 ### 修复
 
 - 渲染层全面改为节点树构建：`IslandPresentation` 新增 `material()`，`wave` / `header` / `markdown` 与岛视图、原生请求卡片改为先描述节点树、在 DOM 边界一次性物化，文本一律经文本节点注入；`setHTML` / `innerHTML` / `insertAdjacentHTML` 动态汇聚点全部移除，从结构上消除转义遗漏导致的 XSS 风险面。
+- 审批让位倒计时重挂缺口：定时器在交互期间到期后改为重新评估而非静默失效，释放编辑（`releaseEditing`）后重新挂起倒计时，提交决策时清空陈旧期限；此前点过自定义文本框再失焦后卡片倒计时会永久停摆并误显「已交回客户端」。新增 handoff-runner 回归场景。
+- Claude Code hook 只读名单移除 `NotebookEdit`：笔记本是可写文件，其审批必须到达小岛，不再静默回退原生 UI。
+- Claude / Codex hook 脚本 stdin 读取增加 1 MiB 上限：超限输入按无效事件丢弃并走 fail-open，本地进程无法再用超大输入撑爆 hook 内存。
+- 设置页关于卡改为动态显示应用与 Electron 运行时版本（原为硬编码过时的「DSH 个人候选 · Electron 33.4.11」）。
 - `application-runner` GUI 测试仍调用 v0.2.0 已更名的 `focusDsh` 预加载 API，导致该 runner 在 main 上失败；改用 `focusSession`。
 
 ## [0.2.0] - 2026-10-25

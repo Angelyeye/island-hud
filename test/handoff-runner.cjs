@@ -91,6 +91,26 @@ app.whenReady().then(async () => {
     if (!heldReply || heldReply.decision !== 'return') throw new Error('re-expanded card was not handed back');
     checks.push('re-expanding the card restarts the countdown and hands the request back');
 
+    // 5. Editing holds the handoff — and the countdown must genuinely restart
+    // after the edit is released. A timer that fired while the user was busy
+    // used to leave the card stuck on a stale, already-expired deadline.
+    let editResolved = false;
+    const editing = exchange({
+      id: 'handoff-edit', provider: 'dsh', kind: 'question', sessionId: 'handoff-session',
+      payload: { questions: [{ id: 'q0', question: '编辑保持？', options: [{ label: '是' }, { label: '否' }] }] },
+    }, { descriptor }).then(r => { editResolved = true; return r; });
+    await until(async () => (await snapshot()).some(r => r.requestId === 'handoff-edit' && r.state === 'pending'));
+    await countdownShows();
+    await win.webContents.executeJavaScript('document.querySelector("textarea").dispatchEvent(new Event("pointerdown", {bubbles:true}))');
+    await pause(3000); // Longer than the 2s budget: the timer fires while busy.
+    if (editResolved) throw new Error('card was handed back while the user was editing');
+    await until(async () => (await snapshot()).some(r => r.requestId === 'handoff-edit' && r.state === 'pending'));
+    await win.webContents.executeJavaScript('window.dispatchEvent(new Event("blur"))');
+    await countdownShows(); // The countdown restarts instead of freezing.
+    const editReply = await Promise.race([editing, pause(6000).then(() => null)]);
+    if (!editReply || editReply.decision !== 'return') throw new Error('released edit was not handed back: ' + JSON.stringify(editReply));
+    checks.push('editing holds the countdown and releasing the edit re-arms it to a real handoff');
+
     fs.writeFileSync(resultFile, JSON.stringify({ status: 'passed', checks,
       electron: process.versions.electron, handoffSeconds: process.env.ISLAND_HUD_TEST_HANDOFF_SECONDS,
       note: 'Real application with exchange protocol fixtures; the client-side decision path (return) is provider-independent.',

@@ -19,6 +19,8 @@
   function fill(value) {
     saved = value;
     $('version').textContent = 'v' + value.version + (value.packaged ? '' : ' · dev');
+    $('aboutVersion').textContent = 'v' + (value.version || '未知');
+    $('aboutElectron').textContent = value.electronVersion || '未知';
     for (const key of fields) { const el = $(key), item = value[key] ?? P.DEFAULTS[key] ?? false; if (el.type === 'checkbox') el.checked = !!item; else el.value = item; }
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;

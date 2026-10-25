@@ -13,6 +13,8 @@ const fakeSpawn = impl => {
   fn.calls = calls;
   return fn;
 };
+// Tests pass fictional directories; production validates with fs.statSync.
+const isDir = () => ({ isDirectory: () => true });
 
 test('windows discovery probes the per-user install before the machine-wide one', () => {
   const env = { LOCALAPPDATA: 'C:\\users\\u\\AppData\\Local', ProgramFiles: 'C:\\Program Files' };
@@ -39,19 +41,30 @@ test('the client override is a test-only seam and must exist on disk', () => {
 
 test('openWorkspace detaches a launch that carries only the project directory', () => {
   const spawnFn = fakeSpawn();
-  assert.equal(openWorkspace('C:\\Program Files\\ZCode\\ZCode.exe', 'C:\\work\\demo', { platform: 'win32', spawnFn }), true);
+  assert.equal(openWorkspace('C:\\Program Files\\ZCode\\ZCode.exe', 'C:\\work\\demo', { platform: 'win32', spawnFn, statFn: isDir }), true);
   assert.deepEqual(spawnFn.calls[0].args, ['C:\\work\\demo']);
   assert.equal(spawnFn.calls[0].opts.detached, true);
   assert.equal(spawnFn.calls[0].opts.stdio, 'ignore');
   assert.equal(spawnFn.calls[0].opts.windowsHide, true);
 });
 
+test('a workspace that is not an existing directory never reaches the launcher', () => {
+  const spawnFn = fakeSpawn();
+  assert.equal(openWorkspace('exe', 'C:\\gone', { platform: 'win32', spawnFn, statFn: () => undefined }), false,
+    'a missing directory is refused');
+  assert.equal(openWorkspace('exe', 'C:\\work\\notes.txt', { platform: 'win32', spawnFn, statFn: () => ({ isDirectory: () => false }) }), false,
+    'a plain file is not a workspace');
+  assert.equal(openWorkspace('exe', 'C:\\work', { platform: 'win32', spawnFn, statFn: () => { throw new Error('stat denied'); } }), false,
+    'an inaccessible path is refused');
+  assert.deepEqual(spawnFn.calls, [], 'no launch attempt was made');
+});
+
 test('macOS goes through the workspace deep link and failures stay silent', () => {
   const spawnFn = fakeSpawn();
-  assert.equal(openWorkspace('/usr/bin/open', 'C:\\work\\中文 目录', { platform: 'darwin', spawnFn }), true);
+  assert.equal(openWorkspace('/usr/bin/open', 'C:\\work\\中文 目录', { platform: 'darwin', spawnFn, statFn: isDir }), true);
   assert.deepEqual(spawnFn.calls[0].args, ['zcode://workspace/open?path=' + encodeURIComponent('C:\\work\\中文 目录')]);
   const throwing = fakeSpawn(() => { throw new Error('boom'); });
-  assert.equal(openWorkspace('exe', 'dir', { platform: 'win32', spawnFn: throwing }), false);
+  assert.equal(openWorkspace('exe', 'dir', { platform: 'win32', spawnFn: throwing, statFn: isDir }), false);
   const asyncError = fakeSpawn(() => ({ on(name, handler) { if (name === 'error') handler(new Error('late')); }, unref() {} }));
-  assert.equal(openWorkspace('exe', 'dir', { platform: 'win32', spawnFn: asyncError }), true);
+  assert.equal(openWorkspace('exe', 'dir', { platform: 'win32', spawnFn: asyncError, statFn: isDir }), true);
 });

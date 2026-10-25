@@ -33,8 +33,8 @@ async function until(check) { for (let i = 0; i < 100; i++) { if (await check())
 app.whenReady().then(async () => {
   win = new BrowserWindow({ width: 568, height: 624, frame: false, transparent: true, focusable: false, show: false,
     webPreferences: { preload: path.resolve(__dirname, '../src/preload.js'), contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } });
-  win.webContents.on('console-message', (_event, level, message, line, source) => {
-    if (level >= 2) console.error(`renderer console ${level} ${source}:${line} ${message}`);
+  win.webContents.on('console-message', details => {
+    if (details.level === 'warning' || details.level === 'error') console.error(`renderer console ${details.level} ${details.sourceId}:${details.lineNumber} ${details.message}`);
   });
   const js = code => win.webContents.executeJavaScript(code);
   try {

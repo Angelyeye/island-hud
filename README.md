@@ -32,7 +32,7 @@
 
 Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成一条窄边，需要决策时展开为审批或问答卡片。允许一次、拒绝、选择答案，都不必切回终端寻找那个正在等待你的窗口。
 
-它把 **DeepSeek Harness（DSH，原生插件接入）** 与 **ZCode（hook 配置接入）** 的会话合并在同一个列表里，让两类客户端的运行状态、待处理请求和完成结果，都能在同一座岛上看到。
+它把 **DeepSeek Harness（DSH，原生插件接入）** 与 **ZCode / Claude Code / Codex（hook 配置接入）** 的会话合并在同一个列表里，让各客户端的运行状态、待处理请求和完成结果，都能在同一座岛上看到。
 
 > [!IMPORTANT]
 > **非官方声明**：Island HUD 是独立的社区开源项目，与 DeepSeek、ZCode 及其他任何产品、公司、团队均无关联，也未获得任何形式的背书、授权或支持。
@@ -43,7 +43,7 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 
 | ◉ 一眼看清 | ⚡ 就地决策 | 🗂 顺手管理 |
 | --- | --- | --- |
-| **会话状态**<br>当前会话、项目、工具与运行状态，一抬眼就能看到。<br><br>**完成提醒**<br>任务结束给出轻提示，点开即是本轮摘要。<br><br>**多会话浏览**<br>待处理与运行中优先，紧凑列表承载更多会话。 | **单次审批**<br>允许一次、拒绝或返回客户端，结果原路回传。<br><br>**多题问答**<br>单选、多选、自由文本，逐题保存草稿，兼容中文输入法。<br><br>**非阻塞接续**<br>卡片收起后请求仍在后台等待，稍后回答也不迟。 | **精确跳转**<br>点卡片直达 DSH 会话；ZCode 会话打开项目目录。<br><br>**归档与删除**<br>只在本机隐藏，不删除客户端数据，随时可恢复。<br><br>**外观可调**<br>密度、字号、最大高度与主题，均可在设置页实时预览。 |
+| **会话状态**<br>当前会话、项目、工具与运行状态，一抬眼就能看到。<br><br>**完成提醒**<br>任务结束给出轻提示，点开即是本轮摘要。<br><br>**多会话浏览**<br>待处理与运行中优先，紧凑列表承载更多会话。 | **单次审批**<br>允许一次、拒绝或返回客户端，结果原路回传。<br><br>**多题问答**<br>单选、多选、自由文本，逐题保存草稿，兼容中文输入法。<br><br>**非阻塞接续**<br>卡片收起后请求仍在后台等待，稍后回答也不迟。 | **精确跳转**<br>点卡片直达 DSH 会话；ZCode / Claude Code / Codex 会话打开项目目录。<br><br>**归档与删除**<br>只在本机隐藏，不删除客户端数据，随时可恢复。<br><br>**外观可调**<br>密度、字号、最大高度与主题，均可在设置页实时预览。 |
 
 ## 界面预览
 
@@ -55,7 +55,7 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 <p align="center">
   <img src="screenshots/settings.png" width="720" alt="Island HUD 集成设置" />
   <br />
-  <sub><b>集成设置</b> · DSH 与 ZCode 各自显示连接状态和版本，安装、修复、卸载只需一次点击。</sub>
+  <sub><b>集成设置</b> · DSH / ZCode / Claude Code / Codex 各自显示连接状态和版本，安装、修复、卸载只需一次点击。</sub>
 </p>
 
 ## 支持的客户端
@@ -64,8 +64,11 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 | --- | --- | --- | --- |
 | **DeepSeek Harness** | 本机原生插件 | 会话状态 · 权限审批 · 多题问答<br><sub>支持 timed 非阻塞</sub> | 精确定位到对应会话 |
 | **ZCode** | 写入 hook 配置 | 会话状态 · 权限审批 · 多题问答<br><sub>答案经审批面回传，实验性</sub> | 打开会话所在项目目录 |
+| **Claude Code** | 写入 hook 配置 | 会话状态 · 权限审批 · AskUserQuestion 问答 | 打开会话所在项目目录 |
+| **Codex CLI** | 写入 hook 配置 | 会话状态 · 权限审批<br><sub>审批仅交互（TUI）会话；需 /hooks 信任一次</sub> | 打开会话所在项目目录 |
+| ~~ChatGPT 桌面版~~ | 无官方接口 | ——<br><sub>无本地集成面，暂不支持</sub> | —— |
 
-两类客户端共用同一套回环通道与同一块岛，列表按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
+各客户端共用同一套回环通道与同一块岛，列表按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
 
 ## 快速开始
 
@@ -96,7 +99,7 @@ npm start
 
 - `npm ci` 严格按锁文件安装依赖；Electron 二进制下载受限时，可临时设置 `$env:ELECTRON_MIRROR` 指向镜像。
 - `npm run build:helpers` 调用 Windows 自带的 .NET Framework 4 编译器，把 `tools/pipe-host.cs` 编译成管道助手；源码变更后会自动重建。
-- `npm start` 是**隔离开发模式**：使用独立的 `work/development` 配置与数据目录，不会改动你正在使用的 DSH / ZCode 配置与模型权限。正式使用请在设置页安装对应集成。
+- `npm start` 是**隔离开发模式**：使用独立的 `work/development` 配置与数据目录，不会改动你正在使用的 DSH / ZCode / Claude Code / Codex 配置与模型权限。正式使用请在设置页安装对应集成。
 
 > [!TIP]
 > **环境要求**：Windows 10 / 11（x64）、Node.js 24（自带 npm）、Electron（版本由 `package.json` 精确锁定），以及可用于构建管道助手的 `csc.exe`。
@@ -133,10 +136,56 @@ npm start
 
 </details>
 
+### Claude Code · Hook 配置
+
+1. 确认 Claude Code 卡片可点击，选择「安装 / 修复」。
+2. 安装把本集成添加的 hook 写入 Claude Code 用户配置（`~/.claude/settings.json`，遵循 `CLAUDE_CONFIG_DIR`）：写入前自动备份，只改动本集成添加的条目，已有的其他 hook（通知、状态栏等）保持不变。
+3. 重新发起一个 Claude Code 会话即生效：会话状态、权限审批与 `AskUserQuestion` 提问会出现在岛上。
+4. 卸载时点击「卸载集成」，只移除本集成添加的 hook 条目。
+
+<details>
+<summary><b>查看 Claude Code 兼容、回退与冲突说明</b></summary>
+
+<br />
+
+- hook 脚本由 `node` 执行，请确保 Node.js 在 PATH 中（Windows 上的命令执行经 Git Bash；未安装时 Claude Code 会给出明确报错）。
+- 审批卡片打开期间，Claude Code 的原生命令会等待岛上决策；退出 Island HUD 或长时间不响应时自动回退原生审批，不会卡死会话。审批 / 问答卡片最长可等待 24 小时。
+- 只读工具（Read / Glob / Grep 等）与 `bypassPermissions` 模式不会中转，行为与原生一致。
+- `AskUserQuestion` 问答经 `PreToolUse` 的 `updatedInput` 回传答案（question 文本与 header 双键），失败时自动回退原生提问界面。
+- 若还安装了其他会在 `PermissionRequest` 上阻塞的 hook（如其他审批桥），两者会同时等待响应；设置页会提示冲突，按需停用其一。
+- 若配置了 `disableAllHooks: true`，所有 hook 均不生效，设置页会给出警告。
+
+</details>
+
+### Codex · Hook 配置
+
+1. 确认 Codex 卡片可点击，选择「安装 / 修复」。
+2. 安装把本集成添加的 hook 写入 Codex 配置（`~/.codex/hooks.json`，遵循 `CODEX_HOME`）：写入前自动备份，只改动本集成添加的条目，其他工具写入的内容保持不变。
+3. **在 Codex 内运行一次 `/hooks` 信任本集成**，否则 hook 不会执行。
+4. 重新发起一个交互（TUI）会话即生效：会话状态、权限审批会出现在岛上。
+5. 卸载时点击「卸载集成」，只移除本集成添加的 hook 条目。
+
+<details>
+<summary><b>查看 Codex 兼容、回退与已知限制</b></summary>
+
+<br />
+
+- hook 脚本由 `node` 执行，请确保 Node.js 在 PATH 中；Windows 上经 cmd 执行，带空格路径已做引号处理。
+- **审批卡片仅在交互（TUI）会话出现**：`codex exec` 强制 `approval_policy=never`（沙箱在 OS 层直接放行或拒绝），不会产生审批事件；Codex Desktop / VS Code 扩展派发 hook 属上游已知缺陷。会话状态与完成提醒不受此限制。
+- 审批卡片打开期间，Codex 的原生命令会等待岛上决策；退出 Island HUD 或长时间不响应时自动回退原生审批。审批卡片最长可等待 6 小时。
+- 只读工具与 `bypassPermissions` 模式不会中转，行为与原生一致。Codex 无 AskUserQuestion 对应物，不支持问答卡片。
+- 若还安装了其他会在 `PermissionRequest` 上阻塞的 hook，两者会同时等待响应；设置页会提示冲突，按需停用其一。
+
+</details>
+
+### ChatGPT 桌面版 · 不受支持
+
+ChatGPT 桌面应用（Windows）没有任何官方本地集成接口（无 hooks、无自动化 API），第三方应用无法镜像其状态或代答审批；OpenAI 侧的可集成实体是 **Codex CLI**（上文已覆盖）。
+
 ## 工作原理与隐私
 
 ```text
-DSH 插件（原生插件） / ZCode（hook 配置）
+DSH 插件（原生插件） / ZCode / Claude Code / Codex（hook 配置）
         │  只监听 127.0.0.1，每次启动生成一次性令牌
         ▼
 Island HUD  ──▶  顶部悬浮岛 · 设置页 · 托盘 · 全局热键
@@ -198,7 +247,7 @@ hook 由 `node` 执行：先确认 `node` 在 PATH 中，再重新发起一个 Z
 <details>
 <summary><b>支持 macOS / Linux、Claude Code 或其他客户端吗？</b></summary>
 
-当前只支持 Windows 10 / 11 上的 DSH 与 ZCode。其他系统与客户端不在支持范围内，也没有排期承诺。
+当前只支持 Windows 10 / 11 上的 DSH、ZCode、Claude Code 与 Codex CLI。其他系统与客户端不在支持范围内，也没有排期承诺。
 </details>
 
 ## 已知限制
@@ -238,7 +287,7 @@ island-hud/
 ├─ src/
 │  ├─ main.js              Electron 主进程：窗口、托盘、悬浮岛与全局快捷键
 │  ├─ preload.js           渲染进程与主进程之间的受控桥
-│  ├─ app/                 应用生命周期、设置、DSH 与 ZCode 集成管理
+│  ├─ app/                 应用生命周期、设置、DSH / ZCode / Claude / Codex 集成管理
 │  ├─ bridge/              本机回环服务，接收并回传集成请求
 │  ├─ dsh/                 DSH 适配层、会话管理与导航
 │  ├─ integrations/        DSH 插件包与 ZCode hook 的构建素材

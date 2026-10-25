@@ -43,7 +43,7 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 
 | ◉ At a glance | ⚡ Decide in place | 🗂 Manage as you go |
 | --- | --- | --- |
-| **Session status**<br>Current session, project, tools, and run state — visible at a glance.<br><br>**Completion alerts**<br>A light hint when a task finishes; open it for the summary of that turn.<br><br>**Multi-session browsing**<br>Pending and running sessions come first, and the compact list holds more of them. | **Single approval**<br>Allow once, deny, or return to the client — the result goes back the way it came.<br><br>**Multi-question prompts**<br>Single choice, multiple choice, or free text; drafts are saved per question, and Chinese IME input works as expected.<br><br>**Non-blocking continuation**<br>The request keeps waiting in the background after the card collapses, so you can answer later. | **Precise jump**<br>Click a card to land in the DSH session; a ZCode / Claude Code / Codex session opens its project directory.<br><br>**Archive and delete**<br>Hides things locally only — no client data is deleted, and everything can be restored.<br><br>**Adjustable appearance**<br>Density, font size, maximum height, and theme all preview live on the settings page. |
+| **Session status**<br>Current session, project, tools, and run state — visible at a glance.<br><br>**Completion alerts**<br>A light hint when a task finishes; open it for the summary of that turn.<br><br>**Multi-session browsing**<br>Pending and running sessions come first, and the compact list holds more of them. | **Single approval**<br>Allow once, deny, or return to the client — the result goes back the way it came.<br><br>**Multi-question prompts**<br>Single choice, multiple choice, or free text; drafts are saved per question, and Chinese IME input works as expected.<br><br>**Client handoff**<br>Optional: approval/question cards count down and hand the request back to the agent's own approval UI — decide right in the agent; works the same for all four clients.<br><br>**Non-blocking continuation**<br>The request keeps waiting in the background after the card collapses, so you can answer later. | **Precise jump**<br>Click a card to land in the DSH session; a ZCode / Claude Code / Codex session opens its project directory.<br><br>**Archive and delete**<br>Hides things locally only — no client data is deleted, and everything can be restored.<br><br>**Adjustable appearance**<br>Density, font size, maximum height, and theme all preview live on the settings page. |
 
 ## Screenshots
 
@@ -181,6 +181,16 @@ The plugin writes to the DSH configuration in a managed way. Uninstalling is a s
 ### ChatGPT desktop · not supported
 
 The ChatGPT desktop app (Windows) exposes no official local integration surface (no hooks, no automation API), so a third-party app cannot mirror its status or answer approvals on its behalf. The integratable OpenAI entity is the **Codex CLI** (covered above).
+
+### Client approval handoff (optional, off by default)
+
+By default the island waits for your decision for as long as the request lives. If you mostly watch the terminal, enable **Settings → General → Approval & questions → client handoff**:
+
+- Once enabled, approval/question cards show a countdown on the island first; when it expires untouched the request is **handed back automatically**, and the native approval UI of DSH / ZCode / Claude Code / Codex takes over — decide right in the agent.
+- Clicking on the island during the countdown (allow/deny/answer) still wins — first decision lands.
+- Collapsing the card or starting to edit an answer pauses the countdown; re-expanding restarts it.
+- Because agent approval protocols are serial (the native UI does not show while the island holds the decision), this is a time-shared two-surface experience — island first, then the native UI — not a side-by-side display.
+- With handoff off (default) the island simply keeps waiting, exactly as before.
 
 ## How it works and privacy
 

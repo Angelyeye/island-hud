@@ -13,6 +13,7 @@
   const native = window.createNativeRequests({ layers, api: preview ? { reply: async () => ({ status: 'delivered' }) } : isDemo ? null : api?.native,
     keyboard: enabled => api?.keyboard?.(enabled), esc: P.escape, askIcon: () => '<span aria-hidden="true">▤</span>',
     sessionOf: request => state.sessions.find(s => s.provider === request.provider && s.rawId === request.sessionId),
+    handoffSeconds: () => Number(settings.approvalHandoffSeconds) || 0,
     toast: showToast, changed: refresh, feedback: confirmed });
   const activeSessions = list => list.filter(s => s.phase !== 'idle');
   const relative = time => { const seconds = Math.max(0, Math.floor((Date.now() - (time || Date.now())) / 1000)); return seconds < 60 ? seconds + 's' : seconds < 3600 ? Math.floor(seconds / 60) + 'm' : Math.floor(seconds / 3600) + 'h'; };

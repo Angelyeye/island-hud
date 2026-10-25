@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id), P = window.IslandPresentation, api = window.island?.settings, sessionApi = window.island?.sessions;
-  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions'];
+  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','approvalHandoffSeconds'];
   const disposers = [];
   let saved = null, environment = { dark: true }, busy = false, previewReady = false;
   const status = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' error' : ''); };

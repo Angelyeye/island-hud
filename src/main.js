@@ -156,6 +156,11 @@ const loadSettings = () => settingsStore.load();
 const saveSettings = () => settingsStore.save();
 // The integration manager must see saved settings, not constructor defaults.
 loadSettings();
+// Isolated GUI runs pin the handoff countdown; the handoff runner overrides
+// this in its own process to exercise the opt-in behavior.
+if (TEST_ROOT && process.env.ISLAND_HUD_TEST_HANDOFF_SECONDS !== undefined) {
+  settings.approvalHandoffSeconds = Number(process.env.ISLAND_HUD_TEST_HANDOFF_SECONDS) || 0;
+}
 
 const archiveStore = new ArchiveStore(TEST_ROOT ? path.join(TEST_ROOT, 'archived-sessions.json') : path.join(app.getPath('appData'), 'IslandHUD/archived-sessions.json'), { log: diag });
 archiveStore.load();

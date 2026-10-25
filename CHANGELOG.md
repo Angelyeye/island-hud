@@ -4,15 +4,14 @@
 
 ## [Unreleased]
 
-### 新增
-
-- **客户端审批让位**（可选，默认关闭）：设置 → 通用 → 审批与提问可开启。开启后审批/提问卡片先在小岛倒计时，到期无人操作自动交回客户端，由 DSH / ZCode / Claude Code / Codex 的原生审批界面接管，可直接在 agent 内决策；倒计时期间小岛点击仍生效，收起卡片或编辑答案会暂停倒计时。新增实机回归 runner（handoff-runner）覆盖倒计时、自动让位、收起守卫与重新展开。
+## [0.3.0] - 2026-10-25
 
 ### 新增
 
 - **Claude Code 支持**：通过 `~/.claude/settings.json` hook 接入（遵循 `CLAUDE_CONFIG_DIR`），岛上展示会话状态，权限审批与 `AskUserQuestion` 问答可直接决策；问答答案经 `PreToolUse` 的 `updatedInput` 回写（问题文本与 header 双键）。协议行为以本机 Claude Code 2.1.310 实测为准。
 - **Codex CLI 支持**：通过 `~/.codex/hooks.json` 原生 hook 接入（遵循 `CODEX_HOME`），岛上展示会话状态与权限审批（仅交互 TUI 会话，需在 Codex 内 `/hooks` 信任一次；`codex exec` 不产生审批事件属上游行为）。以本机 Codex 0.164.0 实测为准。
 - 设置页新增 Claude Code 与 Codex 集成卡片：安装 / 修复 / 卸载均先备份、原子写入、只改动本集成添加的条目，并检测其他 `PermissionRequest` hook 的共存冲突；Claude 配置了 `disableAllHooks` 时给出警告。
+- **客户端审批让位**（可选，默认关闭）：设置 → 通用 → 审批与提问可开启。开启后审批/提问卡片先在小岛倒计时，到期无人操作自动交回客户端，由 DSH / ZCode / Claude Code / Codex 的原生审批界面接管，可直接在 agent 内决策；倒计时期间小岛点击仍生效，收起卡片或编辑答案会暂停倒计时。新增实机回归 runner（handoff-runner）覆盖倒计时、自动让位、收起守卫与重新展开。
 - 新增可选真实 CLI 端到端测试 `npm run test:e2e`（需 `ISLAND_HUD_E2E=1`，消耗少量模型额度）：真实 `claude -p` / `codex exec` 会话经沙箱配置把审批与事件送到岛上并自动应答。
 - 新增实机 GUI 回归 runner（`npm run test:ui` 的 providers-runner）：真实 hook 脚本 × 真实管道 × 真实 Windows 鼠标点击，覆盖 Claude/Codex/ZCode 审批与问答决策。
 

@@ -2,7 +2,8 @@
 // Native requests share the reference notch's layers, colors and scene transitions.
 // A mounted question survives session refreshes and later request arrivals.
 (() => {
-  window.createNativeRequests = ({ layers, api, keyboard, changed, toast, esc, askIcon, sessionOf = () => null, feedback = toast, handoffSeconds = () => 0 }) => {
+  const P = window.IslandPresentation;
+  window.createNativeRequests = ({ layers, api, keyboard, changed, toast, askIcon, sessionOf = () => null, feedback = toast, handoffSeconds = () => 0 }) => {
     let requests = [], active = null, collapsed = false, submitting = false;
     let page = 0, reviewing = false, revision = 0;
     let expiryTimer = null, expiryNotice = '';
@@ -14,7 +15,7 @@
     const drafts = window.createQuestionDraftCache({ storage });
     window.addEventListener('pagehide', () => { save(); drafts.flush(); });
     const submitted = new Map();
-    const source = request => window.IslandPresentation.meta(request?.provider).chip;
+    const source = request => P.meta(request?.provider).chip;
     const layerName = request => request?.kind === 'approval' ? 'approval' : 'ask';
     const layer = () => active ? layers[layerName(active)] : null;
     const answers = request => drafts.get(request);
@@ -71,19 +72,25 @@
       answer.custom = field.querySelector('textarea').value;
       drafts.touch(active);
     };
-    const action = (name, text, css = 'btn-deny') => `<button class="${css}" data-native-action="${name}">${text}</button>`;
+    const action = (name, text, css = 'btn-deny') => ({ tag: 'button', attrs: { class: css, 'data-native-action': name }, kids: [text] });
     const metadata = request => {
       const cwd = request.payload.cwd || '';
-      const project = cwd.split(/[\\/]/).filter(Boolean).pop() || (request.sessionId ? '当前会话' : '未关联会话');
       const full = `来源：${source(request)}\n项目：${cwd || '未提供'}\n请求：${request.requestId}\n会话：${request.sessionId || '未关联（不推断会话）'}`;
-      return `<details class="request-meta"><summary>请求详情${!request.sessionId ? ' · 未关联会话' : ''}</summary><pre>${esc(full)}</pre></details>`;
+      return { tag: 'details', attrs: { class: 'request-meta' }, kids: [
+        { tag: 'summary', kids: ['请求详情' + (!request.sessionId ? ' · 未关联会话' : '')] },
+        { tag: 'pre', kids: [full] },
+      ] };
     };
-    const head = request => window.IslandPresentation.header(sessionOf(request) || { provider: request.provider, title: request.payload.sessionTitle || '当前请求', cwd: request.payload.cwd, phase: request.kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer' }, {
-      controls: `<button class="collapse-request" data-native-action="collapse" aria-label="收起卡片" title="收起卡片，保留待处理请求">−</button>` }) + `<div class="${request.kind === 'approval' ? 'appr-head' : 'ask-head'} native-head">
-      ${request.kind === 'approval' ? '<span class="appr-dot"></span>' : askIcon()}
-      <span>${esc(source(request))} · ${request.kind === 'approval' ? '权限请求' : request.blocking === false ? '可继续工作 · 待回答' : '需要回答后继续'}</span>
-      <span class="request-expiry" data-native-expiry>${esc(expiryText(request))}</span>
-      <span class="appr-queue" data-native-queue>${requests.length > 1 ? `1 / ${requests.length} 待处理` : ''}</span></div>`;
+    const head = request => [
+      P.header(sessionOf(request) || { provider: request.provider, title: request.payload.sessionTitle || '当前请求', cwd: request.payload.cwd, phase: request.kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer' }, {
+        controls: [{ tag: 'button', attrs: { class: 'collapse-request', 'data-native-action': 'collapse', 'aria-label': '收起卡片', title: '收起卡片，保留待处理请求' }, kids: ['−'] }] }),
+      { tag: 'div', attrs: { class: (request.kind === 'approval' ? 'appr-head' : 'ask-head') + ' native-head' }, kids: [
+        request.kind === 'approval' ? { tag: 'span', attrs: { class: 'appr-dot' } } : askIcon(),
+        { tag: 'span', kids: [source(request) + ' · ' + (request.kind === 'approval' ? '权限请求' : request.blocking === false ? '可继续工作 · 待回答' : '需要回答后继续')] },
+        { tag: 'span', attrs: { class: 'request-expiry', 'data-native-expiry': true }, kids: [expiryText(request)] },
+        { tag: 'span', attrs: { class: 'appr-queue', 'data-native-queue': true }, kids: [requests.length > 1 ? `1 / ${requests.length} 待处理` : ''] },
+      ] },
+    ];
     function updateControls() {
       if (!active) return;
       const disabled = uncertain || submitting || active.state !== 'pending' || expired(active);
@@ -101,32 +108,68 @@
       let body;
       if (request.kind === 'approval') {
         const tool = request.payload.tool || {};
-        body = `<div class="native-scroll approval-content"><div class="appr-tool"><span class="appr-icon">⚠</span><span class="appr-name">${esc(tool.name || '工具操作')}</span></div>
-          ${tool.target ? `<p class="detail-label">目标</p><pre class="native-detail">${esc(tool.target)}</pre>` : ''}
-          <p class="detail-label">操作内容</p><pre class="native-detail">${esc(tool.operation || tool.inputSummary || '客户端未提供操作详情')}</pre>
-          <p class="detail-label">申请理由</p><p class="approval-reason">${esc(tool.reason || tool.detail || '客户端未提供理由')}</p>${metadata(request)}</div>
-          <div class="appr-btns native-buttons">${action('return', '返回客户端')}${action('deny', '拒绝')}${action('allow', '允许一次', 'btn-allow')}</div>`;
+        body = [
+          { tag: 'div', attrs: { class: 'native-scroll approval-content' }, kids: [
+            { tag: 'div', attrs: { class: 'appr-tool' }, kids: [
+              { tag: 'span', attrs: { class: 'appr-icon' }, kids: ['⚠'] },
+              { tag: 'span', attrs: { class: 'appr-name' }, kids: [tool.name || '工具操作'] },
+            ] },
+            ...(tool.target ? [
+              { tag: 'p', attrs: { class: 'detail-label' }, kids: ['目标'] },
+              { tag: 'pre', attrs: { class: 'native-detail' }, kids: [tool.target] },
+            ] : []),
+            { tag: 'p', attrs: { class: 'detail-label' }, kids: ['操作内容'] },
+            { tag: 'pre', attrs: { class: 'native-detail' }, kids: [tool.operation || tool.inputSummary || '客户端未提供操作详情'] },
+            { tag: 'p', attrs: { class: 'detail-label' }, kids: ['申请理由'] },
+            { tag: 'p', attrs: { class: 'approval-reason' }, kids: [tool.reason || tool.detail || '客户端未提供理由'] },
+            metadata(request),
+          ] },
+          { tag: 'div', attrs: { class: 'appr-btns native-buttons' }, kids: [action('return', '返回客户端'), action('deny', '拒绝'), action('allow', '允许一次', 'btn-allow')] },
+        ];
       } else if (reviewing) {
-        body = `<div class="native-scroll native-review"><div class="ask-q">检查答案 · 共 ${answers(request).length} 题</div>${answers(request).map((a, i) =>
-          `<div class="answer-review"><h3>${i + 1}. ${esc(request.payload.questions[i].question)}</h3><p>${esc([...a.selected, a.custom].filter(Boolean).join('；') || '未填写（将跳过此题）')}</p></div>`).join('')}${metadata(request)}</div>
-          <div class="appr-btns native-buttons">${action('edit', '返回修改')}${action('submit', '确认提交', 'btn-allow')}</div>`;
+        body = [
+          { tag: 'div', attrs: { class: 'native-scroll native-review' }, kids: [
+            { tag: 'div', attrs: { class: 'ask-q' }, kids: [`检查答案 · 共 ${answers(request).length} 题`] },
+            ...answers(request).map((a, i) => ({ tag: 'div', attrs: { class: 'answer-review' }, kids: [
+              { tag: 'h3', kids: [`${i + 1}. ` + request.payload.questions[i].question] },
+              { tag: 'p', kids: [[...a.selected, a.custom].filter(Boolean).join('；') || '未填写（将跳过此题）'] },
+            ] })),
+            metadata(request),
+          ] },
+          { tag: 'div', attrs: { class: 'appr-btns native-buttons' }, kids: [action('edit', '返回修改'), action('submit', '确认提交', 'btn-allow')] },
+        ];
       } else {
         const question = request.payload.questions[page];
         const draft = answers(request).find(a => a.id === question.id);
-        const options = question.options.map((option, i) => `<label class="ask-opt native-option" title="${esc(option.description)}">
-          <input type="${question.multiSelect ? 'checkbox' : 'radio'}" name="native-choice" value="${esc(option.label)}" ${draft.selected.includes(option.label) ? 'checked' : ''}>
-          <span class="ask-num">${i + 1}</span><span class="option-copy"><strong>${esc(option.label)}</strong>${option.description ? `<small>${esc(option.description)}</small>` : ''}</span><span class="option-check" aria-hidden="true">✓</span></label>`).join('');
-        body = `<div class="native-scroll"><fieldset data-id="${esc(question.id)}"><legend class="ask-q native-question">${esc(question.question)}</legend>
-          ${question.detail ? `<p class="question-detail">${esc(question.detail)}</p>` : ''}
-          <div class="ask-opts native-options">${options}</div>
-          <label class="answer-label" for="native-answer">${question.options.length ? question.multiSelect ? '补充内容（可选）' : '或自由回答' : '自由回答'}</label>
-          <textarea id="native-answer" class="answer-text" placeholder="${question.options.length && !question.multiSelect ? '填写后使用自由回答' : '输入答案'}">${esc(draft.custom)}</textarea>
-          </fieldset></div>
-          <div class="question-progress"><span>第 ${page + 1} / ${request.payload.questions.length} 题 · ${question.multiSelect ? '多选' : '单选 / 文本'}</span><span class="selection-count">${question.multiSelect ? `已选 ${draft.selected.length} 项` : ''}</span></div>
-          <div class="appr-btns native-buttons">${page ? action('prev', '上一题') : action('return', '返回客户端')}${action('next', page + 1 < request.payload.questions.length ? '下一题' : '检查答案', 'btn-allow')}</div>`;
+        body = [
+          { tag: 'div', attrs: { class: 'native-scroll' }, kids: [
+            { tag: 'fieldset', attrs: { 'data-id': question.id }, kids: [
+              { tag: 'legend', attrs: { class: 'ask-q native-question' }, kids: [question.question] },
+              question.detail ? { tag: 'p', attrs: { class: 'question-detail' }, kids: [question.detail] } : '',
+              { tag: 'div', attrs: { class: 'ask-opts native-options' }, kids: question.options.map((option, i) => ({ tag: 'label', attrs: { class: 'ask-opt native-option', title: option.description }, kids: [
+                { tag: 'input', attrs: { type: question.multiSelect ? 'checkbox' : 'radio', name: 'native-choice', value: option.label, ...(draft.selected.includes(option.label) ? { checked: true } : {}) } },
+                { tag: 'span', attrs: { class: 'ask-num' }, kids: [i + 1] },
+                { tag: 'span', attrs: { class: 'option-copy' }, kids: [
+                  { tag: 'strong', kids: [option.label] },
+                  option.description ? { tag: 'small', kids: [option.description] } : '',
+                ] },
+                { tag: 'span', attrs: { class: 'option-check', 'aria-hidden': 'true' }, kids: ['✓'] },
+              ] })) },
+              { tag: 'label', attrs: { class: 'answer-label', for: 'native-answer' }, kids: [question.options.length ? question.multiSelect ? '补充内容（可选）' : '或自由回答' : '自由回答'] },
+              { tag: 'textarea', attrs: { id: 'native-answer', class: 'answer-text', placeholder: question.options.length && !question.multiSelect ? '填写后使用自由回答' : '输入答案' }, kids: [draft.custom] },
+            ] },
+          ] },
+          { tag: 'div', attrs: { class: 'question-progress' }, kids: [
+            { tag: 'span', kids: [`第 ${page + 1} / ${request.payload.questions.length} 题 · ` + (question.multiSelect ? '多选' : '单选 / 文本')] },
+            { tag: 'span', attrs: { class: 'selection-count' }, kids: [question.multiSelect ? `已选 ${draft.selected.length} 项` : ''] },
+          ] },
+          { tag: 'div', attrs: { class: 'appr-btns native-buttons' }, kids: [page ? action('prev', '上一题') : action('return', '返回客户端'), action('next', page + 1 < request.payload.questions.length ? '下一题' : '检查答案', 'btn-allow')] },
+        ];
       }
-      target.innerHTML = head(request) + body;
-      target.insertAdjacentHTML('beforeend', '<p class="request-error" role="status" aria-live="polite"></p>');
+      target.replaceChildren(P.material([...head(request), ...body]));
+      const error = document.createElement('p'); error.className = 'request-error';
+      error.setAttribute('role', 'status'); error.setAttribute('aria-live', 'polite');
+      target.append(error);
       for (const detail of target.querySelectorAll('details')) detail.addEventListener('toggle', () => changed());
       const field = target.querySelector('fieldset');
       if (field) {

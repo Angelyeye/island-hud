@@ -42,51 +42,79 @@
   function safeLink(value) {
     try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.href : null; } catch { return null; }
   }
+  // Views are described as plain node trees — {tag, attrs, kids}, a bare array
+  // as fragment, a string/number as text — and materialized exactly once at the
+  // DOM boundary. No view code ever concatenates untrusted strings into HTML,
+  // so there is no escaping step to forget.
+  function material(node, doc = globalThis.document, ns = null) {
+    if (node === null || node === undefined || node === false || node === '') return null;
+    if (typeof node === 'string' || typeof node === 'number') return doc.createTextNode(String(node));
+    if (Array.isArray(node)) {
+      const frag = doc.createDocumentFragment();
+      for (const kid of node) { const child = material(kid, doc, ns); if (child) frag.append(child); }
+      return frag;
+    }
+    const scope = node.ns || ns;
+    const el = scope ? doc.createElementNS(scope, node.tag) : doc.createElement(node.tag);
+    for (const [name, value] of Object.entries(node.attrs || {})) {
+      if (value === null || value === undefined || value === false) continue;
+      el.setAttribute(name, value === true ? '' : String(value));
+    }
+    for (const kid of node.kids || []) { const child = material(kid, doc, scope); if (child) el.append(child); }
+    return el;
+  }
   // This deliberately implements a small text-only Markdown vocabulary. No HTML
   // parser, scripts, image loads or plug-ins ever see the source text.
-  function inline(source) {
+  function inlineKids(source) {
     // Unclosed delimiters in huge command/log lines must not make the regular
     // expression backtrack quadratically. Preserve these lines verbatim.
-    if (source.length > 4096) return escape(source);
+    if (source.length > 4096) return [source];
     const regex = /(`[^`\n]+`|!\[[^\]\n]*\]\([^\s)]*\)|\[[^\]\n]+\]\([^\s)]*\)|\*\*[^*\n]+\*\*|\*[^*\n]+\*)/g;
-    let out = '', at = 0, match;
+    const kids = [], text = value => { if (value) kids.push(value); };
+    let at = 0, match;
     while ((match = regex.exec(source))) {
-      out += escape(source.slice(at, match.index));
+      text(source.slice(at, match.index));
       const token = match[0];
-      if (token[0] === '`') out += '<code>' + escape(token.slice(1, -1)) + '</code>';
-      else if (token.startsWith('![')) out += '<span class="image-placeholder">' + escape(token.slice(2, token.indexOf(']')) || '图片') + '（图片未加载）</span>';
+      if (token[0] === '`') kids.push({ tag: 'code', kids: [token.slice(1, -1)] });
+      else if (token.startsWith('![')) kids.push({ tag: 'span', attrs: { class: 'image-placeholder' }, kids: [token.slice(2, token.indexOf(']')) || '图片', '（图片未加载）'] });
       else if (token[0] === '[') {
         const split = token.indexOf(']('), label = token.slice(1, split), url = safeLink(token.slice(split + 2, -1));
-        out += url ? '<a href="' + escape(url) + '" data-external-url="' + escape(url) + '">' + escape(label) + '</a>' : escape(label);
-      } else if (token.startsWith('**')) out += '<strong>' + escape(token.slice(2, -2)) + '</strong>';
-      else out += '<em>' + escape(token.slice(1, -1)) + '</em>';
+        kids.push(url ? { tag: 'a', attrs: { href: url, 'data-external-url': url }, kids: [label] } : label);
+      } else if (token.startsWith('**')) kids.push({ tag: 'strong', kids: [token.slice(2, -2)] });
+      else kids.push({ tag: 'em', kids: [token.slice(1, -1)] });
       at = regex.lastIndex;
     }
-    return out + escape(source.slice(at));
+    text(source.slice(at));
+    return kids;
   }
   function markdown(text) {
     const lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
-    let html = '', paragraph = [], code = null, language = '', list = null;
-    const closeParagraph = () => { if (paragraph.length) { html += '<p>' + paragraph.map(inline).join('<br>') + '</p>'; paragraph = []; } };
-    const closeList = () => { if (list) { html += '</' + list + '>'; list = null; } };
+    const blocks = []; let paragraph = [], code = null, language = '', list = null;
+    const closeParagraph = () => {
+      if (!paragraph.length) return;
+      const kids = [];
+      for (const segment of paragraph) { if (kids.length) kids.push({ tag: 'br' }); kids.push(...inlineKids(segment)); }
+      blocks.push({ tag: 'p', kids }); paragraph = [];
+    };
+    const closeList = () => { if (list) { blocks.push(list); list = null; } };
     for (const line of lines) {
       if (/^\s*```/.test(line)) {
         closeParagraph(); closeList();
-        if (code !== null) { html += '<pre><code' + (language ? ' data-language="' + escape(language) + '"' : '') + '>' + escape(code.join('\n')) + '</code></pre>'; code = null; }
+        if (code !== null) { blocks.push({ tag: 'pre', kids: [{ tag: 'code', attrs: language ? { 'data-language': language } : {}, kids: [code.join('\n')] }] }); code = null; }
         else { code = []; language = line.trim().slice(3).replace(/[^a-zA-Z0-9_+-]/g, '').slice(0, 24); }
         continue;
       }
       if (code !== null) { code.push(line); continue; }
       if (!line.trim()) { closeParagraph(); closeList(); continue; }
       const heading = /^(#{1,6})\s+(.+)$/.exec(line), item = /^\s*(?:([-+*])|\d+[.)])\s+(.+)$/.exec(line), quote = /^>\s?(.*)$/.exec(line);
-      if (heading) { closeParagraph(); closeList(); const n = Math.min(4, heading[1].length + 1); html += '<h' + n + '>' + inline(heading[2]) + '</h' + n + '>'; }
-      else if (item) { closeParagraph(); const kind = item[1] ? 'ul' : 'ol'; if (list !== kind) { closeList(); html += '<' + kind + '>'; list = kind; } html += '<li>' + inline(item[2]) + '</li>'; }
-      else if (quote) { closeParagraph(); closeList(); html += '<blockquote>' + inline(quote[1]) + '</blockquote>'; }
+      if (heading) { closeParagraph(); closeList(); blocks.push({ tag: 'h' + Math.min(4, heading[1].length + 1), kids: inlineKids(heading[2]) }); }
+      else if (item) { closeParagraph(); const kind = item[1] ? 'ul' : 'ol'; if (!list || list.tag !== kind) { closeList(); list = { tag: kind, kids: [] }; } list.kids.push({ tag: 'li', kids: inlineKids(item[2]) }); }
+      else if (quote) { closeParagraph(); closeList(); blocks.push({ tag: 'blockquote', kids: inlineKids(quote[1]) }); }
       else { closeList(); paragraph.push(line); }
     }
     closeParagraph(); closeList();
-    if (code !== null) html += '<pre><code>' + escape(code.join('\n')) + '</code></pre>';
-    return html;
+    if (code !== null) blocks.push({ tag: 'pre', kids: [{ tag: 'code', kids: [code.join('\n')] }] });
+    return blocks;
   }
   const plain = text => String(text || '').replace(/^\s{0,3}(?:#{1,6}\s+|>\s?)/gm, '').replace(/```[^\n]*\n?/g, '').replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1（图片）').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
   function summary(text, limit = 1200) { const chars = Array.from(String(text || '')); return { text: chars.slice(0, limit).join(''), truncated: chars.length > limit }; }
@@ -99,12 +127,22 @@
   };
   const meta = provider => providers[provider] || { chip: provider ? String(provider).toUpperCase() : 'HUD', title: '会话', subtitle: provider || '', focus: '在客户端', view: '在客户端查看' };
   function wave(phase = 'idle') {
-    return '<span class="status-wave phase-' + escape(phase) + '" aria-hidden="true">' + [7, 13, 19, 11, 6].map((h, i) => '<i style="--bar:' + h + 'px;--delay:' + (-i * .17) + 's"></i>').join('') + '</span>';
+    return { tag: 'span', attrs: { class: 'status-wave phase-' + (phase || 'idle'), 'aria-hidden': 'true' },
+      kids: [7, 13, 19, 11, 6].map((h, i) => ({ tag: 'i', attrs: { style: '--bar:' + h + 'px;--delay:' + (-i * .17) + 's' } })) };
   }
   function header(session = {}, options = {}) {
     const pm = meta(session.provider);
     const title = session.title || pm.title, project = session.project || session.cwd?.split(/[\\/]/).filter(Boolean).pop() || '当前会话';
-    return '<header class="session-header">' + wave(session.phase || options.phase) + '<div class="session-heading"><h1 title="' + escape(project + ' · ' + title) + '">' + escape(project === title ? title : project + ' · ' + title) + '</h1><p>' + escape(session.lastUserText ? '你：' + session.lastUserText : options.subtitle || pm.subtitle) + '</p></div><span class="source-chip">' + escape(pm.chip) + '</span>' + (options.controls || '') + '</header>';
+    const controls = Array.isArray(options.controls) ? options.controls : options.controls ? [options.controls] : [];
+    return { tag: 'header', attrs: { class: 'session-header' }, kids: [
+      wave(session.phase || options.phase),
+      { tag: 'div', attrs: { class: 'session-heading' }, kids: [
+        { tag: 'h1', attrs: { title: project + ' · ' + title }, kids: [project === title ? title : project + ' · ' + title] },
+        { tag: 'p', kids: [session.lastUserText ? '你：' + session.lastUserText : options.subtitle || pm.subtitle] },
+      ] },
+      { tag: 'span', attrs: { class: 'source-chip' }, kids: [pm.chip] },
+      ...controls,
+    ] };
   }
   class DisplayPolicy {
     constructor({ now = Date.now, settings = {} } = {}) { this.now = now; this.settings = normalize(settings); this.manualScene = null; this.hovered = false; this.hoverAt = null; this.leaveAt = null; this.protected = false; this.completion = null; this.seen = new Map(); }
@@ -136,5 +174,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, geometry, escape, safeLink, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, geometry, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
 });

@@ -19,6 +19,11 @@ test('layout uses logical pixels and bounds both density modes inside a small wo
   const small = P.geometry({}, { workArea: { width: 360, height: 500 }, reducedMotion: true });
   assert.equal(small.width, 328); assert.equal(small.maxHeight, 436); assert.equal(small.reduced, true);
   assert.equal(P.normalize({ panelDensity: 'bad', contentFontSize: 100, completionDwellMs: -1 }).contentFontSize, 16);
+  const handoff = P.normalize({ approvalHandoffSeconds: 999 });
+  assert.equal(handoff.approvalHandoffSeconds, 120);
+  assert.equal(P.normalize({}).approvalHandoffSeconds, 0);
+  assert.equal(P.normalize({ approvalHandoffSeconds: 0 }).approvalHandoffSeconds, 0);
+  assert.equal(P.normalize({ approvalHandoffSeconds: 7.6 }).approvalHandoffSeconds, 8);
 });
 test('local Markdown escapes HTML, strips dangerous links, never emits images and preserves code', () => {
   const html = P.markdown('# 中文标题\n\n- **清单**\n- `inline`\n\n> 引用\n\n<script>alert(1)</script>\n\n![remote](https://example.com/a.png)\n\n[bad](javascript:alert) [ok](https://example.com/test)\n\n```html\n<img src=x onerror=alert(1)>\n```');

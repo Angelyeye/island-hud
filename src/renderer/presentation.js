@@ -6,7 +6,8 @@
 })(typeof window === 'object' ? window : globalThis, () => {
   const DEFAULTS = Object.freeze({ panelDensity: 'comfortable', contentFontSize: 13, maxPanelHeight: 560,
     expandOnHover: true, autoCollapseOnLeave: true, completionReveal: 'glance', completionView: 'markdown-summary',
-    completionDwellMs: 5000, motionMode: 'system', settingsTheme: 'system', autoHideWhenIdle: false });
+    completionDwellMs: 5000, motionMode: 'system', settingsTheme: 'system', autoHideWhenIdle: false,
+    approvalHandoffSeconds: 0 });
   const choices = { panelDensity: ['comfortable', 'compact'], completionReveal: ['glance', 'expanded'],
     completionView: ['markdown-summary', 'text-summary', 'full'], motionMode: ['system', 'reduced', 'full'],
     settingsTheme: ['system', 'dark', 'light'] };
@@ -21,6 +22,9 @@
     result.contentFontSize = Math.round(Math.max(11, Math.min(16, result.contentFontSize)));
     result.maxPanelHeight = Math.round(Math.max(320, Math.min(640, result.maxPanelHeight)));
     result.completionDwellMs = Math.round(Math.max(2000, Math.min(15000, result.completionDwellMs)));
+    // Opt-in handoff: 0 keeps the island waiting (default); otherwise the
+    // card counts down and returns the request to the client's native UI.
+    result.approvalHandoffSeconds = Math.round(Math.max(0, Math.min(120, result.approvalHandoffSeconds)));
     return result;
   }
   function geometry(input = {}, environment = {}) {

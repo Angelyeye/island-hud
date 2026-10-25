@@ -12,16 +12,17 @@ if (version !== declared) throw new Error(`Preserved Electron ${declared} runtim
 const out = path.resolve(process.argv[2] || path.join(root, 'work/ui-tests', randomUUID()));
 fs.mkdirSync(out, { recursive: true });
 const cases = [['electron-runner.cjs', 'electron-test-result.json'], ['windows-input-runner.cjs', 'windows-input-result.json'],
-  ['providers-runner.cjs', 'providers-result.json'], ['renderer-runner.cjs', 'renderer-result.json'],
-  ['application-runner.cjs', 'application-result.json'],
+  ['providers-runner.cjs', 'providers-result.json'], ['handoff-runner.cjs', 'handoff-result.json'],
+  ['renderer-runner.cjs', 'renderer-result.json'], ['application-runner.cjs', 'application-result.json'],
   ['visual-runner.cjs', 'visual-result.json'], ['upgrade-runner.cjs', 'upgrade-result.json']];
 const reports = [];
 for (const [runner, reportName] of cases) {
   const testRoot = path.join(out, path.basename(runner, '.cjs'));
   fs.mkdirSync(testRoot, { recursive: true });
-  const env = { ...process.env, ISLAND_HUD_TEST_ROOT: testRoot };
+  // The approval handoff stays off everywhere except its dedicated runner.
+  const env = { ...process.env, ISLAND_HUD_TEST_ROOT: testRoot, ISLAND_HUD_TEST_HANDOFF_SECONDS: '0' };
   for (const key of Object.keys(env)) {
-    if (key === 'ISLAND_HUD_TEST_ROOT') continue;
+    if (key === 'ISLAND_HUD_TEST_ROOT' || key === 'ISLAND_HUD_TEST_HANDOFF_SECONDS') continue;
     if (key === 'ELECTRON_RUN_AS_NODE' || key.startsWith('ISLAND_') || key === 'ISLAND_HUD_UPDATE_URL' || key === 'ISLAND_HUD_DSH_SESSIONS') delete env[key];
   }
   const scale = Number(process.env.ISLAND_HUD_TEST_SCALE || 1);

@@ -19,7 +19,15 @@ test('settings migrate in place preserving user choices and unknown keys; a fres
   assert.equal(store.value.autoCheckUpdates, true); assert.equal(store.value.settingsVersion, 3);
   assert.equal(store.value.panelDensity, 'comfortable'); assert.equal(store.value.dshTimedQuestions, false);
   assert.equal(store.value.completionReveal, 'glance');
+  assert.equal(store.value.approvalHandoffSeconds, 0);
   assert.equal(store.save(), true);
   assert.equal(JSON.parse(fs.readFileSync(file)).hintShown, true);
   assert.deepEqual(fs.readdirSync(path.dirname(file)), ['settings.json']);
+});
+test('a saved approval handoff choice survives reload', t => {
+  const file = path.join(fixture(t), 'settings.json');
+  const store = new SettingsStore(file);
+  store.value.approvalHandoffSeconds = 30;
+  assert.equal(store.save(), true);
+  assert.equal(new SettingsStore(file).load().approvalHandoffSeconds, 30);
 });

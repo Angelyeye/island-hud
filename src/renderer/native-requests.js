@@ -2,11 +2,12 @@
 // Native requests share the reference notch's layers, colors and scene transitions.
 // A mounted question survives session refreshes and later request arrivals.
 (() => {
-  window.createNativeRequests = ({ layers, api, keyboard, changed, toast, esc, askIcon, sessionOf = () => null, feedback = toast }) => {
+  window.createNativeRequests = ({ layers, api, keyboard, changed, toast, esc, askIcon, sessionOf = () => null, feedback = toast, handoffSeconds = () => 0 }) => {
     let requests = [], active = null, collapsed = false, submitting = false;
     let page = 0, reviewing = false, revision = 0;
     let expiryTimer = null, expiryNotice = '';
     let editing = false, composing = false, uncertain = false;
+    let handoffTimer = null, handoffDeadline = 0;
     const disposers = [];
     let storage;
     try { storage = window.localStorage; } catch { /* In-memory drafts remain available. */ }
@@ -30,7 +31,7 @@
     function tickExpiry() {
       if (!active) return;
       const marker = layer()?.querySelector('[data-native-expiry]');
-      if (marker) marker.textContent = expiryText(active);
+      if (marker) marker.textContent = handoffDeadline > 0 ? handoffText() : expiryText(active);
       if (active.state === 'pending' && expired(active)) {
         active.state = 'expired';
         submitting = false;
@@ -40,6 +41,25 @@
           toast('请求已过期，请返回客户端处理');
         }
       }
+    }
+    // Opt-in handoff: while the card waits untouched, count down and then
+    // return the request so the client's own approval UI appears. Any user
+    // interaction pauses the countdown and re-arms it afterwards.
+    const handoffIdle = () => !!active && active.blocking !== false && active.state === 'pending' &&
+      !collapsed && !editing && !composing && !submitting && !uncertain && !reviewing;
+    const handoffText = () => {
+      const seconds = Math.max(0, Math.ceil((handoffDeadline - Date.now()) / 1000));
+      return seconds > 0 ? `${seconds} 秒后回客户端` : '已交回客户端';
+    };
+    function armHandoff() {
+      clearTimeout(handoffTimer); handoffTimer = null; handoffDeadline = 0;
+      const seconds = handoffSeconds();
+      if (!(seconds > 0) || !handoffIdle()) return;
+      handoffDeadline = Date.now() + seconds * 1000;
+      handoffTimer = setTimeout(() => {
+        handoffTimer = null;
+        if (active && active.state === 'pending' && handoffIdle()) void submit('return');
+      }, seconds * 1000);
     }
     const save = () => {
       if (!active || active.kind !== 'question') return;
@@ -125,15 +145,17 @@
         text.addEventListener('pointerdown', activateText);
         text.addEventListener('click', activateText);
         text.addEventListener('compositionstart', () => { composing = true; editing = true; });
-        text.addEventListener('compositionend', () => { composing = false; save(); });
+        text.addEventListener('compositionend', () => { composing = false; save(); armHandoff(); });
         text.addEventListener('input', () => {
           if (!question.multiSelect && text.value) for (const input of field.querySelectorAll('input')) input.checked = false;
           save();
+          armHandoff();
           changed();
         });
         for (const input of field.querySelectorAll('input')) input.addEventListener('change', () => {
           if (!question.multiSelect) text.value = '';
           save();
+          armHandoff();
           const count = target.querySelector('.selection-count');
           if (count && question.multiSelect) count.textContent = `已选 ${answers(request)[page].selected.length} 项`;
           changed();
@@ -153,11 +175,13 @@
       if (active) {
         draw();
         tickExpiry();
+        armHandoff();
       }
       changed();
     }
     async function submit(decision) {
       if (!active || submitting || uncertain || active.state !== 'pending') return;
+      clearTimeout(handoffTimer); handoffTimer = null;
       if (expired(active)) {
         tickExpiry();
         return;
@@ -177,8 +201,8 @@
           : result.status === 'failed' ? '提交失败：' + (result.reason || '请返回客户端处理') : '请求已失效或已被处理');
       } catch { if (active?.id === request.id) { submitting = false; uncertain = true; updateControls(); layer().querySelector('.request-error').textContent = '结果未知，请在 DSH 确认。答案草稿已保留。'; } toast('连接失败，请返回客户端处理'); }
     }
-    function collapse() { save(); collapsed = true; editing = false; keyboard(false); changed(); }
-    function expand() { if (!active) return false; collapsed = false; changed(); return true; }
+    function collapse() { save(); collapsed = true; editing = false; keyboard(false); armHandoff(); changed(); }
+    function expand() { if (!active) return false; collapsed = false; changed(); armHandoff(); return true; }
     function click(event) {
       const button = event.target.closest('[data-native-action]');
       if (!button || !active) return false;
@@ -197,6 +221,7 @@
         if (name === 'next') { if (page < active.payload.questions.length - 1) page++; else reviewing = true; }
         if (name === 'edit') reviewing = false;
         draw();
+        armHandoff();
         changed();
       }
       return true;
@@ -232,7 +257,7 @@
         if (event.isComposing || composing || event.keyCode === 229) return;
         if (event.ctrlKey && event.key === 'Enter' && reviewing && !submitting && !uncertain) { event.preventDefault(); void submit('answer'); }
       },
-      destroy() { save(); drafts.flush(); clearInterval(expiryTimer); },
+      destroy() { save(); drafts.flush(); clearInterval(expiryTimer); clearTimeout(handoffTimer); },
       preview(request) { sync(request ? [request] : []); },
     };
   };

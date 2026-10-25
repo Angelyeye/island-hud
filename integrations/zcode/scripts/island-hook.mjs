@@ -68,6 +68,7 @@ function approvalPayload(input) {
   const toolInput = input.tool_input && typeof input.tool_input === 'object' ? input.tool_input : {};
   const target = targetOf(toolInput);
   const operation = Object.keys(toolInput).length ? compact(JSON.stringify(toolInput), MAX_INPUT_JSON) : '';
+  const alwaysAllowSubject = alwaysAllowSubjectOf(toolInput);
   return {
     cwd: typeof input.cwd === 'string' ? input.cwd : null,
     sessionTitle: projectOf(input.cwd),
@@ -78,6 +79,7 @@ function approvalPayload(input) {
       reason: compact(input.reason, 500),
       ...(target ? { target } : {}),
       ...(operation ? { operation } : {}),
+      ...(alwaysAllowSubject ? { alwaysAllowSubject } : {}),
     },
   };
 }
@@ -101,6 +103,22 @@ function questionEnvelope(input) {
 
 function decisionOutput(decision) {
   return { hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } };
+}
+
+// ZCode persists "always allow" as permission rules keyed by a subject field
+// its rule engine matches on — the same shape its own native option produces.
+// Tools without a subject keep the decision in the client, where ZCode knows
+// its own allowAlways policy.
+const RULE_SUBJECTS = ['command', 'url', 'file_path', 'path', 'pattern'];
+function alwaysAllowSubjectOf(toolInput) {
+  return RULE_SUBJECTS.map(key => toolInput[key]).find(v => typeof v === 'string' && v.trim()) || null;
+}
+function alwaysAllowUpdates(input) {
+  const toolInput = input.tool_input && typeof input.tool_input === 'object' ? input.tool_input : {};
+  const rule = { toolName: compact(input.tool_name, 120) || 'unknown' };
+  const subject = alwaysAllowSubjectOf(toolInput);
+  if (subject) rule.ruleContent = subject;
+  return [{ type: 'addRules', behavior: 'allow', rules: [rule] }];
 }
 
 async function handlePermission(input) {
@@ -138,14 +156,19 @@ async function handlePermission(input) {
   const reply = await exchange({ ...envelopeBase(input), kind: 'approval', blocking: true,
     payload: approvalPayload(input) },
   reply => {
-    if (['allow', 'deny', 'return'].includes(reply.decision)) return reply;
+    if (['allow', 'allow-always', 'deny', 'return'].includes(reply.decision)) return reply;
     throw new Error('Invalid approval decision');
   });
   const outcome = reply.status !== 'delivered' ? (reply.status === 'expired' ? 'cancelled' : 'unavailable')
-    : reply.decision === 'allow' ? 'allowed-once' : reply.decision === 'deny' ? 'rejected' : 'cancelled';
+    : reply.decision === 'allow' ? 'allowed-once'
+    : reply.decision === 'allow-always' ? 'allowed-always'
+    : reply.decision === 'deny' ? 'rejected' : 'cancelled';
   await reportOutcome(input, reply.id, 'ApprovalDecided', outcome);
   if (reply.status !== 'delivered') return;
   if (reply.decision === 'allow') process.stdout.write(JSON.stringify(decisionOutput({ behavior: 'allow' })) + '\n');
+  else if (reply.decision === 'allow-always') process.stdout.write(JSON.stringify(decisionOutput({
+    behavior: 'allow', permissionUpdates: alwaysAllowUpdates(input),
+  })) + '\n');
   else if (reply.decision === 'deny') process.stdout.write(JSON.stringify(decisionOutput({
     behavior: 'deny', message: '已在 Island HUD 中拒绝此请求',
   })) + '\n');

@@ -388,7 +388,7 @@
     if (act === 'copy-reply') { const s = completionSession(); const text = settings.completionView === 'full' && fullReply?.status === 'ok' ? fullReply.text : P.summary(s?.lastAssistantText || '').text; api?.settings?.copy?.(text).then(() => showToast('结果内容已复制')); }
   }
   notch.addEventListener('click', action);
-  notch.addEventListener('mousedown', event => { if (event.button !== 0) return; const el = event.target.closest('[data-native-action]'); if (el && ['allow','deny','return','submit'].includes(el.dataset.nativeAction)) { event.preventDefault(); native.click(event); } }, true);
+  notch.addEventListener('mousedown', event => { if (event.button !== 0) return; const el = event.target.closest('[data-native-action]'); if (el && ['allow','allow-always','deny','return','submit'].includes(el.dataset.nativeAction)) { event.preventDefault(); native.click(event); } }, true);
   // Desktop hit-testing and hover share the main process's sampled rounded
   // boundary. DOM enter/leave can race with its resizing transparent surface.
   if (preview || isDemo) { notch.addEventListener('pointerenter', () => pointer(true)); notch.addEventListener('pointerleave', () => pointer(false)); }

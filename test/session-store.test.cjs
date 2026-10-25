@@ -31,6 +31,8 @@ test('an unrelated native event cannot manufacture activity or a question confir
   assert.equal(store.snapshot().length, 0);
   store.applyEvent({ provider: 'dsh', sessionId: 'S', payload: { event: 'QuestionAnswered', requestId: 'Q', outcome: 'answered' } });
   assert.equal(store.confirmations.get(keyOf('dsh', 'Q')).outcome, 'answered');
+  store.applyEvent({ provider: 'zcode', sessionId: 'S', payload: { event: 'ApprovalDecided', requestId: 'A', outcome: 'allowed-always' } });
+  assert.equal(store.confirmations.get(keyOf('zcode', 'A')).outcome, 'allowed-always');
 });
 test('a ZCode session opened in the client registers without reading as activity', () => {
   let now = 100; const store = new SessionStore({ now: () => now });
@@ -41,6 +43,12 @@ test('a ZCode session opened in the client registers without reading as activity
   assert.equal(view.title, 'Zectrix Note 4C', 'the title falls back to the project until a prompt arrives');
   store.applyEvent({ provider: 'zcode', sessionId: 'session_zectrix', at: ++now, payload: { event: 'UserPromptSubmit', prompt: '继续任务' } });
   assert.equal(store.snapshot().find(s => s.rawId === 'session_zectrix').phase, 'running', 'a real prompt starts the running clock');
+});
+test('a DSH SessionStart still reads as activity; only ZCode cold-opens stay idle', () => {
+  const store = new SessionStore({ now: () => 100 });
+  store.applyEvent({ provider: 'dsh', sessionId: 'D', at: 100, payload: { event: 'SessionStart' } });
+  assert.equal(store.snapshot()[0].phase, 'running',
+    'other providers never cold-open finished conversations, so their SessionStart stays a running signal');
 });
 test('reopening a finished session keeps its state and an in-flight run survives a client open', () => {
   let now = 100; const store = new SessionStore({ now: () => now });

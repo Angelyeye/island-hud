@@ -183,6 +183,23 @@ app.whenReady().then(async () => {
     await until(async () => (await snapshot()).length === 0);
     checks.push('zcode approval deny still routes to its own hook after the provider refactor');
 
+    // 5.5 ZCode always-allow decided by a real click on the island button: the
+    // hook must answer with the ZCode permission rule update for the subject.
+    const zcodeAlways = runHookScript(zcodeHook, {
+      hook_event_name: 'PermissionRequest', session_id: 'providers-zcode-always', cwd: 'C:\\work\\providers-demo',
+      tool_name: 'Write', tool_input: { file_path: 'C:\\x\\keep.ts', content: 'export {}' },
+    });
+    await until(async () => !!pendingOf(await snapshot(), 'zcode', 'approval'));
+    await until(() => win.webContents.executeJavaScript(
+      '!!document.querySelector("[data-native-action=allow-always]")'));
+    await clickNativeAction('allow-always');
+    const alwaysOut = await Promise.race([zcodeAlways, pause(4000).then(() => ({ out: '', err: 'timeout' }))]);
+    assert.equal(alwaysOut.code, 0);
+    assert.deepEqual(JSON.parse(alwaysOut.out).hookSpecificOutput.decision.permissionUpdates,
+      [{ type: 'addRules', behavior: 'allow', rules: [{ toolName: 'Write', ruleContent: 'C:\\x\\keep.ts' }] }]);
+    await until(async () => (await snapshot()).length === 0);
+    checks.push('zcode always-allow click answers the hook with a permission rule update');
+
     // 6. ZCode session focus relaunches the desktop client with the project
     // directory. The override points at a harmless real executable so the
     // assertion never opens the actual ZCode app.

@@ -123,6 +123,35 @@ test('permission request is relayed and an island allow reaches ZCode', async (t
   store.applyEvent(confirmation);
 });
 
+test('an island allow-always returns ZCode permission rule updates for the command subject', async (t) => {
+  const fx = await zfixture(t);
+  const pending = runHook(fx.descriptor, permissionInput({}));
+  await until(() => pendingOf(fx.changes)?.kind === 'approval');
+  const request = pendingOf(fx.changes);
+  assert.equal(request.payload.tool.alwaysAllowSubject, 'npm test',
+    'the card can only offer the button when ZCode has a rule subject to persist');
+  const responded = await fx.hub.respond(request.id, 'allow-always');
+  const result = await pending;
+  assert.equal(responded.status, 'delivered');
+  assert.equal(result.code, 0);
+  const decision = JSON.parse(result.out).hookSpecificOutput.decision;
+  assert.deepEqual(decision, { behavior: 'allow',
+    permissionUpdates: [{ type: 'addRules', behavior: 'allow', rules: [{ toolName: 'Bash', ruleContent: 'npm test' }] }] });
+  await until(() => fx.events.some(e => e.payload.event === 'ApprovalDecided'));
+  assert.equal(fx.events.find(e => e.payload.event === 'ApprovalDecided').payload.outcome, 'allowed-always');
+});
+
+test('a tool without a rule subject offers no always-allow subject to the island', async (t) => {
+  const fx = await zfixture(t);
+  const pending = runHook(fx.descriptor, permissionInput({ tool_name: 'NotebookEdit', tool_input: { notebook: 'C:\\x\\y.ipynb', new_source: 'x' } }));
+  await until(() => pendingOf(fx.changes)?.kind === 'approval');
+  const request = pendingOf(fx.changes);
+  assert.equal(request.payload.tool.alwaysAllowSubject, undefined);
+  await fx.hub.respond(request.id, 'deny');
+  const result = await pending;
+  assert.equal(JSON.parse(result.out).hookSpecificOutput.decision.behavior, 'deny');
+});
+
 test('island deny maps to a deny decision with a message', async (t) => {
   const fx = await zfixture(t);
   const pending = runHook(fx.descriptor, permissionInput({ tool_name: 'Write', tool_input: { file_path: 'C:\\x\\y.ts' } }));

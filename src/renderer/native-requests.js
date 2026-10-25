@@ -127,7 +127,15 @@
             { tag: 'p', attrs: { class: 'approval-reason' }, kids: [tool.reason || tool.detail || '客户端未提供理由'] },
             metadata(request),
           ] },
-          { tag: 'div', attrs: { class: 'appr-btns native-buttons' }, kids: [action('return', '返回客户端'), action('deny', '拒绝'), action('allow', '允许一次', 'btn-allow')] },
+          { tag: 'div', attrs: { class: 'appr-btns native-buttons' }, kids: [
+            action('return', '返回客户端'), action('deny', '拒绝'),
+            // "始终允许" mirrors ZCode's native per-command rule: the hook needs a
+            // rule subject (command/path/URL) to persist, so tools without one
+            // keep the decision in the client where ZCode knows its own policy.
+            ...(request.provider === 'zcode' && request.payload.tool?.alwaysAllowSubject
+              ? [action('allow-always', '始终允许', 'btn-allow')] : []),
+            action('allow', '允许一次', 'btn-allow'),
+          ] },
         ];
       } else if (reviewing) {
         body = [
@@ -259,7 +267,7 @@
         tickExpiry();
         return true;
       }
-      if (['allow', 'deny', 'return'].includes(name)) void submit(name);
+      if (['allow', 'allow-always', 'deny', 'return'].includes(name)) void submit(name);
       else if (name === 'submit') void submit('answer');
       else {
         save(); editing = false; keyboard(false);
@@ -279,7 +287,7 @@
         disposers.push(api.onConfirmation?.(value => {
           const sent = submitted.get(value.id);
           if (!sent || sent.confirmed || Date.now() - sent.at > 600000) return;
-          const message = { 'allowed-once': '客户端已确认允许一次', rejected: '客户端已确认拒绝', answered: '客户端已收到答案', cancelled: '客户端已取消请求', unavailable: '客户端未接受该请求' }[value.outcome];
+          const message = { 'allowed-once': '客户端已确认允许一次', 'allowed-always': '客户端已确认始终允许', rejected: '客户端已确认拒绝', answered: '客户端已收到答案', cancelled: '客户端已取消请求', unavailable: '客户端未接受该请求' }[value.outcome];
           if (message) {
             sent.confirmed = true;
             if (value.outcome === 'answered' && sent.draftKey) drafts.removeKey(sent.draftKey);

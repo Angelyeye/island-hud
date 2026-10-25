@@ -72,7 +72,7 @@ function validateRequest(msg) {
 function validateDecision(request, decision, extra = {}) {
   if (decision === 'return') return { decision: 'return' };
   if (request.kind === 'approval') {
-    if (!['allow', 'deny'].includes(decision)) throw new Error('Invalid approval decision');
+    if (!['allow', 'deny', 'allow-always'].includes(decision)) throw new Error('Invalid approval decision');
     return { decision };
   }
   if (request.kind !== 'question' || decision !== 'answer') throw new Error('Invalid decision');

@@ -1,6 +1,6 @@
 {
   "name": "@island-hud/zcode-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Island HUD bridge for ZCode hooks: session events, approval and question relay",
   "type": "module",
   "main": "scripts/island-hook.mjs",

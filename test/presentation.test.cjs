@@ -2,6 +2,28 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const P = require('../src/renderer/presentation');
+test('the materialization boundary drops inline handlers and non-http(s) URLs even if a tree carried them', () => {
+  const seen = [];
+  const track = kind => { const node = { kind, kids: [], attrs: {} }; seen.push(node); node.append = child => node.kids.push(child); node.setAttribute = (name, value) => { node.attrs[name] = value; }; return node; };
+  const doc = {
+    createTextNode: value => { const node = track('text'); node.text = value; return node; },
+    createElement: tag => { const node = track('element'); node.tag = tag; return node; },
+    createElementNS: (ns, tag) => { const node = track('element'); node.ns = ns; node.tag = tag; return node; },
+    createDocumentFragment: () => track('fragment'),
+  };
+  P.material({ tag: 'a', attrs: { href: 'https://example.com/ok', 'data-external-url': 'https://example.com/ok',
+    onclick: 'alert(1)', onerror: 'alert(1)', title: '示例', style: '--bar:13px' },
+    kids: ['正文', { tag: 'img', attrs: { src: 'data:image/png;base64,AAAA' } }] }, doc);
+  const anchor = seen.find(n => n.tag === 'a');
+  assert.equal(anchor.attrs.href, 'https://example.com/ok');
+  assert.equal(anchor.attrs['data-external-url'], 'https://example.com/ok');
+  assert.equal(anchor.attrs.title, '示例');
+  assert.equal(anchor.attrs.style, '--bar:13px', 'static style from view code still applies');
+  assert.equal(anchor.attrs.onclick, undefined, 'inline handlers never reach setAttribute');
+  assert.equal(anchor.attrs.onerror, undefined);
+  const img = seen.find(n => n.tag === 'img');
+  assert.equal(img.attrs.src, undefined, 'data: URLs are dropped at the boundary');
+});
 test('display policy separates hover, manual collapse, protected editing and completion deduplication', () => {
   let now = 10000; const policy = new P.DisplayPolicy({ now: () => now });
   policy.enter(); now += 149; assert.equal(policy.scene(), 'compact'); now++;

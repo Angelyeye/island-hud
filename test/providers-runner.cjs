@@ -183,6 +183,23 @@ app.whenReady().then(async () => {
     await until(async () => (await snapshot()).length === 0);
     checks.push('zcode approval deny still routes to its own hook after the provider refactor');
 
+    // 6. ZCode session focus relaunches the desktop client with the project
+    // directory. The override points at a harmless real executable so the
+    // assertion never opens the actual ZCode app.
+    const focusDir = path.join(root, 'zcode-focus-workspace');
+    fs.mkdirSync(focusDir, { recursive: true });
+    process.env.ISLAND_ZCODE_CLIENT = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'whoami.exe');
+    await runHookScript(zcodeHook, {
+      hook_event_name: 'SessionStart', session_id: 'providers-zcode-focus', cwd: focusDir,
+    });
+    const sessionSnapshot = () => win.webContents.executeJavaScript('window.island.snapshot()');
+    await until(async () => (await sessionSnapshot()).some(s => s.provider === 'zcode' && s.rawId === 'providers-zcode-focus'));
+    const focusTarget = (await sessionSnapshot()).find(s => s.rawId === 'providers-zcode-focus');
+    const focusResult = await win.webContents.executeJavaScript(
+      `window.island.focusSession(${JSON.stringify(focusTarget.id)})`);
+    assert.equal(focusResult.status, 'navigated');
+    checks.push('zcode session focus relaunches the desktop client with the project directory');
+
     fs.writeFileSync(resultFile, JSON.stringify({ status: 'passed', checks,
       electron: process.versions.electron,
       note: 'Real hook scripts + real hub + real Windows clicks; not native Claude Code/Codex verification.',

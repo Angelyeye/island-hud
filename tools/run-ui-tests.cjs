@@ -28,7 +28,9 @@ for (const [runner, reportName] of cases) {
   const scale = Number(process.env.ISLAND_HUD_TEST_SCALE || 1);
   const args = [path.join(root, 'test', runner)];
   if ([1, 1.25, 1.5].includes(scale) && scale !== 1) args.push('--force-device-scale-factor=' + scale);
-  const run = spawnSync(electron, args, { cwd: root, windowsHide: true, timeout: 25000, env, encoding: 'utf8' });
+  // The providers runner automates five real-click approvals plus a focus
+  // relaunch; 25s left it one slow powershell call away from a hard kill.
+  const run = spawnSync(electron, args, { cwd: root, windowsHide: true, timeout: 45000, env, encoding: 'utf8' });
   fs.writeFileSync(path.join(testRoot, 'stdout.log'), run.stdout || '');
   fs.writeFileSync(path.join(testRoot, 'stderr.log'), run.stderr || '');
   const report = fs.existsSync(path.join(testRoot, reportName)) ? JSON.parse(fs.readFileSync(path.join(testRoot, reportName))) : { status: 'failed', error: run.error?.message || 'Missing GUI report' };

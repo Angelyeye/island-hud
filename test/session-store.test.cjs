@@ -32,6 +32,26 @@ test('an unrelated native event cannot manufacture activity or a question confir
   store.applyEvent({ provider: 'dsh', sessionId: 'S', payload: { event: 'QuestionAnswered', requestId: 'Q', outcome: 'answered' } });
   assert.equal(store.confirmations.get(keyOf('dsh', 'Q')).outcome, 'answered');
 });
+test('a ZCode session opened in the client registers without reading as activity', () => {
+  let now = 100; const store = new SessionStore({ now: () => now });
+  store.applyEvent({ provider: 'zcode', sessionId: 'session_zectrix', at: now, payload: { event: 'SessionStart', cwd: 'C:\\work\\Zectrix Note 4C' } });
+  const view = store.snapshot().find(s => s.rawId === 'session_zectrix');
+  assert.equal(view.phase, 'idle', 'SessionStart alone is an open conversation, not a running task');
+  assert.equal(view.project, 'Zectrix Note 4C');
+  assert.equal(view.title, 'Zectrix Note 4C', 'the title falls back to the project until a prompt arrives');
+  store.applyEvent({ provider: 'zcode', sessionId: 'session_zectrix', at: ++now, payload: { event: 'UserPromptSubmit', prompt: '继续任务' } });
+  assert.equal(store.snapshot().find(s => s.rawId === 'session_zectrix').phase, 'running', 'a real prompt starts the running clock');
+});
+test('reopening a finished session keeps its state and an in-flight run survives a client open', () => {
+  let now = 100; const store = new SessionStore({ now: () => now });
+  store.applyEvent({ provider: 'zcode', sessionId: 'A', at: now, payload: { event: 'Stop' } });
+  assert.equal(store.snapshot()[0].phase, 'completed');
+  store.applyEvent({ provider: 'zcode', sessionId: 'A', at: ++now, payload: { event: 'SessionStart', cwd: 'C:\\w\\demo' } });
+  assert.equal(store.snapshot()[0].phase, 'completed', 'SessionStart does not resurrect a finished session');
+  store.applyEvent({ provider: 'zcode', sessionId: 'B', at: now, payload: { event: 'PreToolUse', tool: { id: 'T', name: 'Bash' } } });
+  store.applyEvent({ provider: 'zcode', sessionId: 'B', at: ++now, payload: { event: 'SessionStart', cwd: 'C:\\w\\demo' } });
+  assert.equal(store.snapshot().find(s => s.rawId === 'B').phase, 'running', 'a client open event must not downgrade an active run');
+});
 test('unassociated questions stay separate; non-blocking questions do not pause a session', () => {
   const store = new SessionStore({ now: () => 100 });
   store.applyEvent({ provider: 'dsh', sessionId: 'S', at: 100, payload: { event: 'UserPromptSubmit' } });

@@ -40,7 +40,10 @@ class SessionStore {
       if (typeof payload.prompt === 'string' && payload.prompt.trim()) next.lastUserText = payload.prompt.slice(0, 300);
       if (typeof payload.title === 'string' && payload.title.trim()) next.title = payload.title;
     }
-    if (['UserPromptSubmit', 'PreToolUse', 'SessionStart'].includes(event)) { next.phase = 'running'; next.completedAt = 0; }
+    // SessionStart also fires when the ZCode desktop client merely cold-opens an
+    // old conversation, so it registers the session and its cwd but must never
+    // read as activity; only a prompt or tool call starts the running clock.
+    if (['UserPromptSubmit', 'PreToolUse'].includes(event)) { next.phase = 'running'; next.completedAt = 0; }
     if (event === 'PreToolUse') { entry.tools.set(payload.tool?.id || 'current', { ...payload.tool, since: updatedAt }); next.currentTool = [...entry.tools.values()].at(-1); }
     if (event === 'PostToolUse') {
       if (payload.callId) entry.tools.delete(payload.callId); else entry.tools.clear();

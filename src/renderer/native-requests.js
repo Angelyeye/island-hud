@@ -60,6 +60,9 @@
       handoffTimer = setTimeout(() => {
         handoffTimer = null;
         if (active && active.state === 'pending' && handoffIdle()) void submit('return');
+        // Busy at fire time (editing etc.): the deadline is stale from here on,
+        // so re-evaluate instead of leaving the countdown permanently stopped.
+        else armHandoff();
       }, seconds * 1000);
     }
     const save = () => {
@@ -234,7 +237,7 @@
       if (decision !== 'return') submitted.set(request.id, { at: Date.now(), confirmed: false,
         draftKey: request.kind === 'question' ? drafts.keyOf(request) : null });
       for (const [id, value] of submitted) if (Date.now() - value.at > 600000) submitted.delete(id);
-      submitting = true; editing = false; keyboard(false); updateControls(); changed();
+      submitting = true; editing = false; keyboard(false); handoffDeadline = 0; updateControls(); changed();
       try {
         const result = await api.reply({ id: request.id, decision, answers: answers(request) });
         if (result.status === 'failed' && active?.id === request.id) { submitting = false; uncertain = true; updateControls(); const message = layer().querySelector('.request-error'); if (message) message.textContent = '结果未知，请在 DSH 确认。答案草稿已保留。'; }
@@ -295,7 +298,9 @@
       click, collapse, expand, pending: () => !!active,
       active: () => active,
       protected: () => !!active && !collapsed && (editing || reviewing || submitting || composing || !!layer()?.querySelector('details[open]')),
-      releaseEditing: () => { editing = false; composing = false; },
+      // Re-arm so leaving edit mode restarts the countdown instead of
+      // leaving a fired or stale deadline on the card forever.
+      releaseEditing: () => { editing = false; composing = false; armHandoff(); },
       keydown(event) {
         if (event.isComposing || composing || event.keyCode === 229) return;
         if (event.ctrlKey && event.key === 'Enter' && reviewing && !submitting && !uncertain) { event.preventDefault(); void submit('answer'); }

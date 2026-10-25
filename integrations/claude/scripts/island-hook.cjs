@@ -13,9 +13,13 @@ const { version: PLUGIN_VERSION } = require('../package.json');
 const { randomUUID } = require('node:crypto');
 // Tools with no side effects never need an island approval. PermissionRequest
 // only fires for tools that ask, so this list is an advisory skip-path.
-const READ_ONLY = /^(?:Read|Glob|Grep|TodoWrite|TodoRead|WebFetch|WebSearch|TaskOutput|TaskStop|NotebookEdit|SlashCommand|ListMcpResources|ReadMcpResource)$/i;
+// NotebookEdit is deliberately absent: notebooks are writable files, so its
+// approvals must reach the island instead of silently falling back.
+const READ_ONLY = /^(?:Read|Glob|Grep|TodoWrite|TodoRead|WebFetch|WebSearch|TaskOutput|TaskStop|SlashCommand|ListMcpResources|ReadMcpResource)$/i;
 const QUESTION_TOOL = /^(?:AskUserQuestion)$/i;
 const MAX_INPUT_JSON = 600;
+// Hook events are a few kilobytes; anything beyond 1 MiB is not a real event.
+const MAX_STDIN_CHARS = 1 << 20;
 
 const compact = (text, limit) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, limit);
 const projectOf = cwd => String(cwd || '').split(/[\\/]/).filter(Boolean).pop() || 'Claude';
@@ -41,7 +45,16 @@ function readStdin() {
     let data = '';
     if (process.stdin.isTTY) return resolve(data);
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', chunk => { data += chunk; });
+    process.stdin.on('data', chunk => {
+      data += chunk;
+      if (data.length > MAX_STDIN_CHARS) {
+        // Oversized input is not a hook event: drop it and fail open. The
+        // later end/error handlers resolve the already-settled promise as no-ops.
+        data = '';
+        process.stdin.destroy();
+        resolve(data);
+      }
+    });
     process.stdin.on('end', () => resolve(data));
     process.stdin.on('error', () => resolve(data));
     // A wedged host must never hold the agent's tool call longer than this.

@@ -25,10 +25,23 @@ test('layout uses logical pixels and bounds both density modes inside a small wo
   assert.equal(P.normalize({ approvalHandoffSeconds: 0 }).approvalHandoffSeconds, 0);
   assert.equal(P.normalize({ approvalHandoffSeconds: 7.6 }).approvalHandoffSeconds, 8);
 });
-test('local Markdown escapes HTML, strips dangerous links, never emits images and preserves code', () => {
-  const html = P.markdown('# 中文标题\n\n- **清单**\n- `inline`\n\n> 引用\n\n<script>alert(1)</script>\n\n![remote](https://example.com/a.png)\n\n[bad](javascript:alert) [ok](https://example.com/test)\n\n```html\n<img src=x onerror=alert(1)>\n```');
-  assert.ok(html.includes('<h2>中文标题</h2>')); assert.ok(html.includes('<ul>')); assert.ok(html.includes('<blockquote>'));
-  assert.doesNotMatch(html, /<script|<img|href="javascript:|onerror="/i);
-  assert.ok(html.includes('&lt;script&gt;')); assert.ok(html.includes('data-external-url="https://example.com/test"'));
+test('local Markdown builds a node tree: text is escaped by construction, dangerous links stripped, never emits images and preserves code', () => {
+  const walk = (node, out = { tags: [], hrefs: [], text: [] }) => {
+    if (node === null || node === undefined || node === false || node === '') return out;
+    if (typeof node === 'string' || typeof node === 'number') { out.text.push(String(node)); return out; }
+    if (Array.isArray(node)) { for (const kid of node) walk(kid, out); return out; }
+    out.tags.push(node.tag); if (node.attrs?.href) out.hrefs.push(node.attrs.href);
+    for (const kid of node.kids || []) walk(kid, out);
+    return out;
+  };
+  const tree = P.markdown('# 中文标题\n\n- **清单**\n- `inline`\n\n> 引用\n\n<script>alert(1)</script>\n\n![remote](https://example.com/a.png)\n\n[bad](javascript:alert) [ok](https://example.com/test)\n\n```html\n<img src=x onerror=alert(1)>\n```');
+  const seen = walk(tree);
+  assert.ok(seen.tags.includes('h2')); assert.ok(seen.tags.includes('ul')); assert.ok(seen.tags.includes('blockquote')); assert.ok(seen.tags.includes('pre'));
+  assert.ok(!seen.tags.some(tag => ['script', 'img', 'iframe', 'style', 'onerror'].includes(tag)), 'no executable tags in the tree');
+  assert.deepEqual(seen.hrefs, ['https://example.com/test']);
+  assert.ok(seen.text.some(value => value.includes('<script>alert(1)</script>')), 'script source only survives as inert text');
+  assert.ok(seen.text.some(value => value.includes('img src=x onerror=alert(1)')), 'code fence content only survives as inert text');
+  const anchors = (function collect(node) { if (Array.isArray(node)) return node.flatMap(collect); if (node?.tag === 'a') return [node]; return node?.kids ? node.kids.flatMap(collect) : []; })(tree);
+  assert.equal(anchors.length, 1); assert.equal(anchors[0].attrs['data-external-url'], 'https://example.com/test');
   assert.equal(Array.from(P.summary('中😀'.repeat(1000)).text).length, 1200);
 });

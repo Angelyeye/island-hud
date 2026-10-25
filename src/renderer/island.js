@@ -11,13 +11,19 @@
   let toastTimer, resultTimer, policyTimer, timeTimer, geometryFrame, geometryUntil = 0, lastBounds = '';
   let fullReply = null, loadingReply = '', fullGeneration = 0, completionFocus = null, appVisible = true, composing = false;
   const native = window.createNativeRequests({ layers, api: preview ? { reply: async () => ({ status: 'delivered' }) } : isDemo ? null : api?.native,
-    keyboard: enabled => api?.keyboard?.(enabled), esc: P.escape, askIcon: () => '<span aria-hidden="true">▤</span>',
+    keyboard: enabled => api?.keyboard?.(enabled), askIcon: () => ({ tag: 'span', attrs: { 'aria-hidden': 'true' }, kids: ['▤'] }),
     sessionOf: request => state.sessions.find(s => s.provider === request.provider && s.rawId === request.sessionId),
     handoffSeconds: () => Number(settings.approvalHandoffSeconds) || 0,
     toast: showToast, changed: refresh, feedback: confirmed });
   const activeSessions = list => list.filter(s => s.phase !== 'idle');
   const relative = time => { const seconds = Math.max(0, Math.floor((Date.now() - (time || Date.now())) / 1000)); return seconds < 60 ? seconds + 's' : seconds < 3600 ? Math.floor(seconds / 60) + 'm' : Math.floor(seconds / 3600) + 'h'; };
-  const esc = P.escape;
+  // setTree renders a node tree into an element and remembers it, so repeated
+  // refreshes skip unchanged subtrees instead of churning the DOM.
+  function setTree(el, tree) {
+    const key = JSON.stringify(tree);
+    if (contents.get(el) === key && el.childNodes.length) return;
+    contents.set(el, key); el.replaceChildren(P.material(tree));
+  }
   function demoData() {
     const now = Date.now();
     return [
@@ -30,10 +36,10 @@
       { id: 'demo-zcode', rawId: 'demo-zcode', provider: 'zcode', project: 'Island HUD', title: '排查管道回退路径', lastUserText: '看看 pipe-host 断开时桥接的回退逻辑', phase: 'running', updatedAt: now - 8000, currentTool: { name: 'Bash', detail: 'npm test', since: now - 3000 } },
     ];
   }
-  function setHTML(el, html) { if (contents.get(el) === html && el.childNodes.length) return; contents.set(el, html); el.innerHTML = html; }
   // DSH's own rows use an archive box; deleting is a separate, explicit action.
-  const archiveIcon = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg>';
-  const deleteIcon = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>';
+  const svgIcon = kids => ({ tag: 'svg', ns: 'http://www.w3.org/2000/svg', attrs: { viewBox: '0 0 24 24', width: 14, height: 14, fill: 'none', stroke: 'currentColor', 'stroke-width': 1.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' }, kids });
+  const archiveIcon = svgIcon([{ tag: 'rect', attrs: { x: 2, y: 3, width: 20, height: 5, rx: 1 } }, { tag: 'path', attrs: { d: 'M4 8v11a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V8' } }, { tag: 'path', attrs: { d: 'M10 12h4' } }]);
+  const deleteIcon = svgIcon([{ tag: 'path', attrs: { d: 'M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2' } }]);
   const hideable = s => !!s && ['idle', 'completed'].includes(s.phase) && !(s.pendingRequests || []).length;
   const hideVerb = mode => mode === 'delete' ? '删除' : '归档';
   const hideBlockedReason = (s, mode) => (s?.pendingRequests || []).length
@@ -41,7 +47,7 @@
   function hideButton(s, mode, extra = '') {
     const blocked = !hideable(s);
     const label = blocked ? hideBlockedReason(s, mode) : hideVerb(mode);
-    return '<button type="button" class="hide-button ' + mode + '-button ' + extra + (blocked ? ' is-blocked' : '') + '" data-act="hide" data-mode="' + mode + '" data-id="' + esc(s.id) + '" title="' + esc(label) + '" aria-label="' + esc(label) + '"' + (blocked ? ' aria-disabled="true"' : '') + '>' + (mode === 'delete' ? deleteIcon : archiveIcon) + '</button>';
+    return { tag: 'button', attrs: { type: 'button', class: 'hide-button ' + mode + '-button ' + extra + (blocked ? ' is-blocked' : ''), 'data-act': 'hide', 'data-mode': mode, 'data-id': s.id, title: label, 'aria-label': label, ...(blocked ? { 'aria-disabled': 'true' } : {}) }, kids: [mode === 'delete' ? deleteIcon : archiveIcon] };
   }
   function syncHideButton(button, s, mode) {
     const blocked = !hideable(s);
@@ -51,13 +57,29 @@
     if (blocked) button.setAttribute('aria-disabled', 'true'); else button.removeAttribute('aria-disabled');
   }
   function headerControls(session, { hide = true } = {}) {
-    return (hide ? hideButton(session, 'archive') + hideButton(session, 'delete') : '') + '<button class="icon-button" data-act="settings" title="打开设置" aria-label="打开设置">⚙</button><button class="collapse-request" data-act="collapse" title="收起" aria-label="收起">−</button>';
+    return [
+      ...(hide ? [hideButton(session, 'archive'), hideButton(session, 'delete')] : []),
+      { tag: 'button', attrs: { class: 'icon-button', 'data-act': 'settings', title: '打开设置', 'aria-label': '打开设置' }, kids: ['⚙'] },
+      { tag: 'button', attrs: { class: 'collapse-request', 'data-act': 'collapse', title: '收起', 'aria-label': '收起' }, kids: ['−'] },
+    ];
   }
   function sessionHeader(session, { controls = true, hideActions = true } = {}) {
-    return P.header(session, { controls: controls ? headerControls(session, { hide: hideActions }) : '' });
+    return P.header(session, { controls: controls ? headerControls(session, { hide: hideActions }) : [] });
   }
-  function rowHTML(s) {
-    return P.wave(s.phase) + '<div class="row-copy"><strong>' + esc(s.title || s.project || '会话') + '</strong><small>' + esc(s.project || '当前项目') + (s.currentTool?.name ? ' · ' + esc(s.currentTool.name + ' ' + (s.currentTool.detail || '')) : '') + '</small></div><div class="row-tags">' + (s.model ? '<span class="source-chip">' + esc(s.model) + '</span>' : '') + '<span class="state-label phase-' + esc(s.phase) + '">' + esc(P.labels[s.phase] || s.phase) + '</span><time data-time="' + (s.updatedAt || Date.now()) + '">' + relative(s.updatedAt) + '</time><span class="row-arrow" aria-hidden="true">↗</span></div>';
+  function rowTree(s) {
+    return [
+      P.wave(s.phase),
+      { tag: 'div', attrs: { class: 'row-copy' }, kids: [
+        { tag: 'strong', kids: [s.title || s.project || '会话'] },
+        { tag: 'small', kids: [s.project || '当前项目', s.currentTool?.name ? ' · ' + s.currentTool.name + ' ' + (s.currentTool.detail || '') : ''] },
+      ] },
+      { tag: 'div', attrs: { class: 'row-tags' }, kids: [
+        s.model ? { tag: 'span', attrs: { class: 'source-chip' }, kids: [s.model] } : '',
+        { tag: 'span', attrs: { class: 'state-label phase-' + s.phase }, kids: [P.labels[s.phase] || s.phase] },
+        { tag: 'time', attrs: { 'data-time': s.updatedAt || Date.now() }, kids: [relative(s.updatedAt)] },
+        { tag: 'span', attrs: { class: 'row-arrow', 'aria-hidden': 'true' }, kids: ['↗'] },
+      ] },
+    ];
   }
   function renderRows(container, list) {
     const live = new Set(list.map(s => s.id));
@@ -65,14 +87,18 @@
     list.forEach((s, index) => {
       let shell = rowNodes.get(s.id);
       if (!shell) {
-        shell = document.createElement('div'); shell.className = 'row-shell'; shell.dataset.id = s.id;
-        const row = document.createElement('button'); row.type = 'button'; row.className = 'all-row session-row'; row.dataset.act = 'jump'; row.dataset.id = s.id;
-        const archive = document.createElement('button'); archive.type = 'button'; archive.className = 'hide-button archive-button row-archive'; archive.dataset.act = 'hide'; archive.dataset.mode = 'archive'; archive.dataset.id = s.id; archive.innerHTML = archiveIcon;
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'hide-button delete-button row-delete'; remove.dataset.act = 'hide'; remove.dataset.mode = 'delete'; remove.dataset.id = s.id; remove.innerHTML = deleteIcon;
-        shell.append(row, archive, remove); rowNodes.set(s.id, shell);
+        // The shell itself must be the real div element: a fragment would be
+        // emptied when its children are adopted into the container.
+        shell = P.material(
+          { tag: 'div', attrs: { class: 'row-shell', 'data-id': s.id }, kids: [
+            { tag: 'button', attrs: { type: 'button', class: 'all-row session-row', 'data-act': 'jump', 'data-id': s.id }, kids: [] },
+            { tag: 'button', attrs: { type: 'button', class: 'hide-button archive-button row-archive', 'data-act': 'hide', 'data-mode': 'archive', 'data-id': s.id }, kids: [archiveIcon] },
+            { tag: 'button', attrs: { type: 'button', class: 'hide-button delete-button row-delete', 'data-act': 'hide', 'data-mode': 'delete', 'data-id': s.id }, kids: [deleteIcon] },
+          ] });
+        rowNodes.set(s.id, shell);
       }
       const row = shell.querySelector('.all-row');
-      setHTML(row, rowHTML(s)); row.title = (s.project || '') + ' · ' + (s.title || '') + ' · 打开此会话';
+      setTree(row, rowTree(s)); row.title = (s.project || '') + ' · ' + (s.title || '') + ' · 打开此会话';
       for (const button of shell.querySelectorAll('.hide-button')) syncHideButton(button, s, button.dataset.mode);
       if (container.children[index] !== shell) container.insertBefore(shell, container.children[index] || null);
     });
@@ -86,47 +112,118 @@
     let title = request?.text || (top?.currentTool?.name ? top.currentTool.name + ': ' + (top.currentTool.detail || top.title) : top?.title) || (state.syncingSessions ? '正在同步会话…' : '等待会话');
     if (completion) { phase = 'completed'; title = '已完成 · ' + P.plain(completion.lastAssistantText || completion.title).replace(/\s+/g, ' '); }
     const count = native.pending() ? apiRequestsCount() : state.sessions.filter(s => ['waitingForApproval','waitingForAnswer'].includes(s.phase)).length;
-    setHTML(layers.compact, P.wave(phase) + '<span class="idle-text" title="' + esc(title) + '">' + esc(title) + '</span><span class="compact-counts">' + (count ? '<span class="pending-count">待处理 ' + count + '</span>' : '') + '<span class="idle-count">' + state.sessions.length + ' 会话</span></span>');
+    setTree(layers.compact, [
+      P.wave(phase),
+      { tag: 'span', attrs: { class: 'idle-text', title }, kids: [title] },
+      { tag: 'span', attrs: { class: 'compact-counts' }, kids: [
+        count ? { tag: 'span', attrs: { class: 'pending-count' }, kids: ['待处理 ' + count] } : '',
+        { tag: 'span', attrs: { class: 'idle-count' }, kids: [state.sessions.length + ' 会话'] },
+      ] },
+    ]);
   }
   function apiRequestsCount() { return native.summary()?.count || 0; }
+  const overviewMoreText = total => '显示全部 ' + total + ' 个会话' + (total >= 50 ? '（已满 50）' : '');
+  function panelTopTree() {
+    return { tag: 'div', attrs: { class: 'panel-top' }, kids: [
+      { tag: 'strong', kids: ['会话'] },
+      { tag: 'button', attrs: { class: 'icon-button', 'data-act': 'settings', 'aria-label': '设置' }, kids: ['⚙'] },
+      { tag: 'button', attrs: { class: 'collapse-request', 'data-act': 'collapse' }, kids: ['−'] },
+    ] };
+  }
+  function heroContextTree(hero) {
+    return { tag: 'div', attrs: { class: 'hero-context hero-jump', 'data-act': 'jump', 'data-id': hero.id }, kids: [
+      { tag: 'span', attrs: { class: 'state-label phase-' + hero.phase }, kids: [P.labels[hero.phase]] },
+      hero.currentTool ? { tag: 'code', kids: [hero.currentTool.name + ' ' + (hero.currentTool.detail || '')] }
+        : { tag: 'p', kids: [P.plain(hero.lastAssistantText || '').slice(0, 180)] },
+    ] };
+  }
+  function heroHeaderTree(hero) {
+    const tree = sessionHeader(hero);
+    tree.attrs.class = 'session-header hero-jump';
+    tree.attrs['data-act'] = 'jump'; tree.attrs['data-id'] = hero.id;
+    return tree;
+  }
   function renderOverview() {
     const list = state.sessions, hero = list.find(s => ['waitingForApproval','waitingForAnswer'].includes(s.phase)) || activeSessions(list)[0] || list[0];
-    if (!hero) { setHTML(layers.overview, '<div class="panel-top"><strong>会话</strong><button class="icon-button" data-act="settings" aria-label="设置">⚙</button><button class="collapse-request" data-act="collapse">−</button></div><div class="empty-state"><div class="empty-orbit">' + P.wave('idle') + '</div><h2>' + (state.syncingSessions ? '正在同步会话…' : '小岛等待中') + '</h2><p>开始一个本机任务，状态将在这里显示。</p></div>'); return; }
-    const jump = ' data-act="jump" data-id="' + esc(hero.id) + '"';
-    const heroHeader = sessionHeader(hero).replace('<header class="session-header"', '<header class="session-header hero-jump"' + jump);
-    const prefix = heroHeader + '<div class="hero-context hero-jump"' + jump + '><span class="state-label phase-' + esc(hero.phase) + '">' + esc(P.labels[hero.phase]) + '</span>' + (hero.currentTool ? '<code>' + esc(hero.currentTool.name + ' ' + (hero.currentTool.detail || '')) + '</code>' : '<p>' + esc(P.plain(hero.lastAssistantText || '').slice(0, 180)) + '</p>') + '</div><div class="overview-list"></div><footer class="panel-footer"><button class="text-button" data-act="overview-more">' + overviewMoreText(list.length) + '</button><span>点击会话打开客户端 ↗</span></footer>';
+    if (!hero) {
+      setTree(layers.overview, [panelTopTree(), { tag: 'div', attrs: { class: 'empty-state' }, kids: [
+        { tag: 'div', attrs: { class: 'empty-orbit' }, kids: [P.wave('idle')] },
+        { tag: 'h2', kids: [state.syncingSessions ? '正在同步会话…' : '小岛等待中'] },
+        { tag: 'p', kids: ['开始一个本机任务，状态将在这里显示。'] },
+      ] }]);
+      return;
+    }
     const existing = layers.overview.querySelector('.overview-list');
-    if (!existing || layers.overview.dataset.hero !== hero.id) { setHTML(layers.overview, prefix); layers.overview.dataset.hero = hero.id; }
-    else {
-      setHTML(layers.overview.querySelector('.session-header'), P.header(hero).replace(/^<header[^>]*>|<\/header>$/g, '') + headerControls(hero));
-      const heroContent = prefix.match(/<div class="hero-context hero-jump"[^>]*>([\s\S]*?)<\/div><div class="overview-list">/)?.[1] || '';
-      setHTML(layers.overview.querySelector('.hero-context'), heroContent);
+    if (!existing || layers.overview.dataset.hero !== hero.id) {
+      setTree(layers.overview, [heroHeaderTree(hero), heroContextTree(hero),
+        { tag: 'div', attrs: { class: 'overview-list' }, kids: [] },
+        { tag: 'footer', attrs: { class: 'panel-footer' }, kids: [
+          { tag: 'button', attrs: { class: 'text-button', 'data-act': 'overview-more' }, kids: [overviewMoreText(list.length)] },
+          { tag: 'span', kids: ['点击会话打开客户端 ↗'] },
+        ] }]);
+      layers.overview.dataset.hero = hero.id;
+    } else {
+      setTree(layers.overview.querySelector('.session-header'), sessionHeader(hero).kids);
+      setTree(layers.overview.querySelector('.hero-context'), heroContextTree(hero).kids);
       layers.overview.querySelector('[data-act=overview-more]').textContent = overviewMoreText(list.length);
     }
     renderRows(layers.overview.querySelector('.overview-list'), list.filter(s => s.id !== hero.id).slice(0, 3));
   }
-  const overviewMoreText = total => '显示全部 ' + total + ' 个会话' + (total >= 50 ? '（已满 50）' : '');
   function renderAllSessions() {
     const list = state.sessions;
-    if (!layers.all.querySelector('.all-list')) setHTML(layers.all, '<div class="panel-top"><strong>全部会话</strong><span class="all-count"></span><button class="collapse-request" data-act="collapse" aria-label="收起">−</button></div><div class="all-list"></div><footer class="all-footer"></footer>');
+    if (!layers.all.querySelector('.all-list')) setTree(layers.all, [
+      { tag: 'div', attrs: { class: 'panel-top' }, kids: [
+        { tag: 'strong', kids: ['全部会话'] },
+        { tag: 'span', attrs: { class: 'all-count' } },
+        { tag: 'button', attrs: { class: 'collapse-request', 'data-act': 'collapse', 'aria-label': '收起' }, kids: ['−'] },
+      ] },
+      { tag: 'div', attrs: { class: 'all-list' }, kids: [] },
+      { tag: 'footer', attrs: { class: 'all-footer' }, kids: [] },
+    ]);
     layers.all.querySelector('.all-count').textContent = '共 ' + list.length + ' 条' + (list.length >= 50 ? ' · 上限 50' : '');
     const container = layers.all.querySelector('.all-list');
     container.classList.toggle('dense', list.length > 10);
     const previous = container.scrollTop;
     renderRows(container, list);
     container.scrollTop = previous;
-    setHTML(layers.all.querySelector('.all-footer'), '<span>待处理优先 · 最近活跃在前</span><span>' + list.length + ' / 50</span>');
+    setTree(layers.all.querySelector('.all-footer'), [
+      { tag: 'span', kids: ['待处理优先 · 最近活跃在前'] },
+      { tag: 'span', kids: [list.length + ' / 50'] },
+    ]);
   }
   function renderReadOnly(kind) {
     const target = kind === 'approval' ? layers.approval : layers.ask, phase = kind === 'approval' ? 'waitingForApproval' : 'waitingForAnswer';
     const s = state.sessions.find(item => item.phase === phase);
-    if (!s) { setHTML(target, '<div class="panel-top"><strong>客户端</strong><button data-act="collapse" class="collapse-request">−</button></div><div class="empty-state">暂无待处理' + (kind === 'approval' ? '审批' : '问题') + '</div>'); return; }
+    if (!s) {
+      setTree(target, [
+        { tag: 'div', attrs: { class: 'panel-top' }, kids: [
+          { tag: 'strong', kids: ['客户端'] },
+          { tag: 'button', attrs: { 'data-act': 'collapse', class: 'collapse-request' }, kids: ['−'] },
+        ] },
+        { tag: 'div', attrs: { class: 'empty-state' }, kids: ['暂无待处理' + (kind === 'approval' ? '审批' : '问题')] },
+      ]);
+      return;
+    }
     const question = s.pendingQuestion || {};
-    setHTML(target, sessionHeader(s, { hideActions: false }) + '<div class="native-head">' + (kind === 'approval' ? '审批状态 · 只读预览' : '问题状态 · 只读预览') + '</div><div class="native-scroll readonly-card"><h2>' + esc(question.text || s.currentTool?.name || '客户端正在等待处理') + '</h2>' + (question.options || []).map((o, i) => '<div class="readonly-option"><span>' + (i + 1) + '</span><div><strong>' + esc(o.label) + '</strong><p>' + esc(o.description || '') + '</p></div></div>').join('') + '<p class="hint">当前只取得日志状态，回复由客户端原生界面处理。</p></div><footer class="native-buttons"><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">' + esc(P.meta(s.provider).focus) + (kind === 'approval' ? '审批' : '回答') + ' ↗</button></footer>');
+    setTree(target, [
+      sessionHeader(s, { hideActions: false }),
+      { tag: 'div', attrs: { class: 'native-head' }, kids: [kind === 'approval' ? '审批状态 · 只读预览' : '问题状态 · 只读预览'] },
+      { tag: 'div', attrs: { class: 'native-scroll readonly-card' }, kids: [
+        { tag: 'h2', kids: [question.text || s.currentTool?.name || '客户端正在等待处理'] },
+        ...(question.options || []).map((o, i) => ({ tag: 'div', attrs: { class: 'readonly-option' }, kids: [
+          { tag: 'span', kids: [i + 1] },
+          { tag: 'div', kids: [{ tag: 'strong', kids: [o.label] }, { tag: 'p', kids: [o.description || ''] }] },
+        ] })),
+        { tag: 'p', attrs: { class: 'hint' }, kids: ['当前只取得日志状态，回复由客户端原生界面处理。'] },
+      ] },
+      { tag: 'footer', attrs: { class: 'native-buttons' }, kids: [
+        { tag: 'button', attrs: { class: 'btn-allow', 'data-act': 'jump', 'data-id': s.id }, kids: [P.meta(s.provider).focus + (kind === 'approval' ? '审批' : '回答') + ' ↗'] },
+      ] },
+    ]);
   }
   function completionSession() { return state.sessions.find(s => s.id === completionFocus) || policy.completion?.session || state.sessions.find(s => s.phase === 'completed') || state.sessions[0]; }
   function renderCompletion() {
-    const s = completionSession(); if (!s) { setHTML(layers.jump, '<div class="empty-state">暂无完成结果</div>'); return; }
+    const s = completionSession(); if (!s) { setTree(layers.jump, [{ tag: 'div', attrs: { class: 'empty-state' }, kids: ['暂无完成结果'] }]); return; }
     const key = JSON.stringify([s.id, s.turn || 0]);
     const full = settings.completionView === 'full';
     if (full && fullReply?.key !== key && loadingReply !== key) {
@@ -136,9 +233,22 @@
     }
     const reply = fullReply?.key === key ? fullReply : null;
     const source = full ? reply?.text || '' : P.summary(s.lastAssistantText || '').text;
-    const html = settings.completionView === 'text-summary' ? '<p class="plain-reply">' + esc(P.plain(source)) + '</p>' : P.markdown(source);
-    const content = full && loadingReply === key ? '<p class="hint">正在读取本回合完整回复…</p>' : full && reply?.status !== 'ok' ? '<p class="hint">本回合完整回复暂不可用，请在客户端查看。</p>' : html || '<p class="hint">客户端未提供结果正文。</p>';
-    setHTML(layers.jump, sessionHeader(s) + '<div class="native-head completed-head">✓ 本回合已完成</div><div class="completion-body native-scroll ' + (full ? 'full-reply' : 'summary-reply') + '">' + content + '</div>' + (reply?.truncated || !full && Array.from(s.lastAssistantText || '').length >= 1200 ? '<p class="hint">内容已截断 · 在客户端查看完整回复</p>' : '') + '<footer class="appr-btns"><button data-act="copy-reply">复制内容</button><button class="btn-allow" data-act="jump" data-id="' + esc(s.id) + '">' + esc(P.meta(s.provider).view) + ' ↗</button></footer>');
+    const bodyTree = settings.completionView === 'text-summary'
+      ? [{ tag: 'p', attrs: { class: 'plain-reply' }, kids: [P.plain(source)] }]
+      : P.markdown(source);
+    const content = full && loadingReply === key ? [{ tag: 'p', attrs: { class: 'hint' }, kids: ['正在读取本回合完整回复…'] }]
+      : full && reply?.status !== 'ok' ? [{ tag: 'p', attrs: { class: 'hint' }, kids: ['本回合完整回复暂不可用，请在客户端查看。'] }]
+      : bodyTree.length ? bodyTree : [{ tag: 'p', attrs: { class: 'hint' }, kids: ['客户端未提供结果正文。'] }];
+    setTree(layers.jump, [
+      sessionHeader(s),
+      { tag: 'div', attrs: { class: 'native-head completed-head' }, kids: ['✓ 本回合已完成'] },
+      { tag: 'div', attrs: { class: 'completion-body native-scroll ' + (full ? 'full-reply' : 'summary-reply') }, kids: content },
+      reply?.truncated || !full && Array.from(s.lastAssistantText || '').length >= 1200 ? { tag: 'p', attrs: { class: 'hint' }, kids: ['内容已截断 · 在客户端查看完整回复'] } : '',
+      { tag: 'footer', attrs: { class: 'appr-btns' }, kids: [
+        { tag: 'button', attrs: { 'data-act': 'copy-reply' }, kids: ['复制内容'] },
+        { tag: 'button', attrs: { class: 'btn-allow', 'data-act': 'jump', 'data-id': s.id }, kids: [P.meta(s.provider).view + ' ↗'] },
+      ] },
+    ]);
   }
   function protectedState() { return native.protected() || composing || state.scene !== 'compact' && (!!window.getSelection()?.toString() || !!layers[state.scene]?.querySelector('details[open]') || document.activeElement?.tagName === 'TEXTAREA'); }
   function desiredScene() {
@@ -191,7 +301,10 @@
   function showToast(text, duration = 3200) { toast.textContent = text; toast.classList.add('on'); clearTimeout(toastTimer); positionToast(); toastTimer = setTimeout(() => toast.classList.remove('on'), duration); }
   function confirmed(message, outcome) {
     if (native.pending()) { showToast(message, 1200); return; }
-    layers.approved.innerHTML = '<span class="result-icon ' + (outcome === 'rejected' ? 'rejected' : '') + '">' + (outcome === 'rejected' ? '−' : '✓') + '</span><span>' + esc(message) + '</span>';
+    setTree(layers.approved, [
+      { tag: 'span', attrs: { class: 'result-icon ' + (outcome === 'rejected' ? 'rejected' : '') }, kids: [outcome === 'rejected' ? '−' : '✓'] },
+      { tag: 'span', kids: [message] },
+    ]);
     clearTimeout(resultTimer); resultTimer = setTimeout(() => { resultTimer = null; refresh(); }, 1200); applyScene('approved');
   }
   function configure(next, env = environment) {

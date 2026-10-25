@@ -23,6 +23,7 @@
 
 ### 修复
 
+- 渲染层全面改为节点树构建：`IslandPresentation` 新增 `material()`，`wave` / `header` / `markdown` 与岛视图、原生请求卡片改为先描述节点树、在 DOM 边界一次性物化，文本一律经文本节点注入；`setHTML` / `innerHTML` / `insertAdjacentHTML` 动态汇聚点全部移除，从结构上消除转义遗漏导致的 XSS 风险面。
 - `application-runner` GUI 测试仍调用 v0.2.0 已更名的 `focusDsh` 预加载 API，导致该 runner 在 main 上失败；改用 `focusSession`。
 
 ## [0.2.0] - 2026-10-25

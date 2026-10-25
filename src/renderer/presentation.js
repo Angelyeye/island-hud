@@ -45,7 +45,12 @@
   // Views are described as plain node trees — {tag, attrs, kids}, a bare array
   // as fragment, a string/number as text — and materialized exactly once at the
   // DOM boundary. No view code ever concatenates untrusted strings into HTML,
-  // so there is no escaping step to forget.
+  // so there is no escaping step to forget. The boundary also enforces what the
+  // view vocabulary only promises: inline handlers are dropped, and URL-bearing
+  // attributes accept only http(s)/mailto (link hrefs already pass safeLink;
+  // this holds for every call site regardless of where the tree was built).
+  const URL_ATTR = /^(?:href|src|xlink:href|formaction|action|poster)$/i;
+  const SAFE_URL = /^(?:https?:|mailto:)[^\s]*$/i;
   function material(node, doc = globalThis.document, ns = null) {
     if (node === null || node === undefined || node === false || node === '') return null;
     if (typeof node === 'string' || typeof node === 'number') return doc.createTextNode(String(node));
@@ -58,7 +63,10 @@
     const el = scope ? doc.createElementNS(scope, node.tag) : doc.createElement(node.tag);
     for (const [name, value] of Object.entries(node.attrs || {})) {
       if (value === null || value === undefined || value === false) continue;
-      el.setAttribute(name, value === true ? '' : String(value));
+      if (/^on/i.test(name)) continue;
+      const text = String(value);
+      if (URL_ATTR.test(name) && !SAFE_URL.test(text)) continue;
+      el.setAttribute(name, value === true ? '' : text);
     }
     for (const kid of node.kids || []) { const child = material(kid, doc, scope); if (child) el.append(child); }
     return el;

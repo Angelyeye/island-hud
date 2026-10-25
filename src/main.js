@@ -23,6 +23,7 @@ const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs
 const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
+const { clientPath: zcodeClientPath, openWorkspace: zcodeOpenWorkspace } = require('./app/zcode-client.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
 const sessionStore = new SessionStore();
@@ -855,28 +856,33 @@ function openSettingsWindow() {
   return settingsWin;
 }
 
-// The installed DSH public protocol only focuses its application. Until a
-// precise session route is verified, report that limit without opening another session.
-// ZCode, Claude Code and Codex expose no per-session deep link either; surface the project directory.
+// ZCode exposes no per-session route into its client, but the desktop app holds
+// a single-instance lock: relaunching it with the session's project directory
+// hands that workspace to the running window and focuses it. Without an
+// installed client — and for Claude Code/Codex, which have no desktop client at
+// all — surface the project directory.
 ipcMain.handle('island:focus', async (_event, id) => {
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
-  if (['zcode', 'claude', 'codex'].includes(session.provider)) {
-    const dir = typeof session.cwd === 'string' ? session.cwd : '';
-    if (!dir) return { status: 'unsupported', sessionId: session.rawId, reason: '该会话未提供项目目录' };
-    const opened = await shell.openPath(dir);
-    return opened ? { status: 'unsupported', sessionId: session.rawId, reason: opened }
-      : { status: 'navigated', sessionId: session.rawId };
+  const dir = typeof session.cwd === 'string' ? session.cwd : '';
+  if (session.provider === 'zcode') {
+    const client = dir ? zcodeClientPath() : null;
+    if (client && zcodeOpenWorkspace(client, dir)) return { status: 'navigated', sessionId: session.rawId };
+  } else if (!['claude', 'codex'].includes(session.provider)) {
+    if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
+      reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
+    const navigation = dshNavigation.request(session.rawId, 2500);
+    try { await shell.openExternal('dsh://open'); } catch { /* The navigation plugin can still handle an already-visible client. */ }
+    const result = await navigation;
+    return result.status === 'navigated'
+      ? { status: 'navigated', sessionId: session.rawId }
+      : { status: result.status === 'expired' ? 'expired' : 'unsupported', sessionId: session.rawId,
+        reason: result.status === 'expired' ? '目标会话已失效' : 'DSH 精确导航插件未连接，请在客户端手动打开' };
   }
-  if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
-    reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
-  const navigation = dshNavigation.request(session.rawId, 2500);
-  try { await shell.openExternal('dsh://open'); } catch { /* The navigation plugin can still handle an already-visible client. */ }
-  const result = await navigation;
-  return result.status === 'navigated'
-    ? { status: 'navigated', sessionId: session.rawId }
-    : { status: result.status === 'expired' ? 'expired' : 'unsupported', sessionId: session.rawId,
-      reason: result.status === 'expired' ? '目标会话已失效' : 'DSH 精确导航插件未连接，请在客户端手动打开' };
+  if (!dir) return { status: 'unsupported', sessionId: session.rawId, reason: '该会话未提供项目目录' };
+  const opened = await shell.openPath(dir);
+  return opened ? { status: 'unsupported', sessionId: session.rawId, reason: opened }
+    : { status: 'navigated', sessionId: session.rawId };
 });
 ipcMain.on('island:interactive', (_e, next) => setInteractive(!!next));
 ipcMain.on('island:bounds', (event, b) => {

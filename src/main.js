@@ -23,6 +23,7 @@ const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs
 const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
+const { openCodexThread } = require('./app/codex-client.cjs');
 const { clientPath: zcodeClientPath, openWorkspace: zcodeOpenWorkspace } = require('./app/zcode-client.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -938,11 +939,9 @@ function openSettingsWindow() {
   return windowRef;
 }
 
-// ZCode exposes no per-session route into its client, but the desktop app holds
-// a single-instance lock: relaunching it with the session's project directory
-// hands that workspace to the running window and focuses it. Without an
-// installed client — and for Claude Code/Codex, which have no desktop client at
-// all — surface the project directory.
+// Codex Desktop exposes an exact thread deep link. ZCode has no per-session
+// route, but its single-instance lock lets a project-directory relaunch focus
+// the workspace. Without an installed ZCode client, surface that directory.
 // A session cwd arrives from provider log files, so every launch path here
 // (ZCode relaunch and the openPath fallback) goes through one gate: it must be
 // an existing directory — a tampered cwd pointing at a file must never reach
@@ -954,12 +953,15 @@ function existingDirectory(value) {
 ipcMain.handle('island:focus', async (_event, id) => {
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
+  if (session.provider === 'codex') {
+    return openCodexThread(session.rawId, { openExternal: uri => shell.openExternal(uri) });
+  }
   const dir = typeof session.cwd === 'string' ? session.cwd : '';
   const workspace = existingDirectory(dir);
   if (session.provider === 'zcode') {
     const client = workspace ? zcodeClientPath() : null;
     if (client && zcodeOpenWorkspace(client, workspace)) return { status: 'navigated', sessionId: session.rawId };
-  } else if (!['claude', 'codex'].includes(session.provider)) {
+  } else if (session.provider !== 'claude') {
     if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
       reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
     const navigation = dshNavigation.request(session.rawId, 2500);

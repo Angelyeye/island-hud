@@ -1,6 +1,6 @@
 {
   "name": "island-hud",
-  "version": "0.3.2",
+  "version": "0.3.1",
   "private": true,
   "description": "A Windows top-of-screen island HUD for DeepSeek Harness (DSH), ZCode, Claude Code and Codex.",
   "license": "AGPL-3.0-only",

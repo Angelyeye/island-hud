@@ -2,9 +2,7 @@
 
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。日期按本地时区记录。
 
-## [0.3.2] - 2026-10-26
-
-- ZCode 会话卡点击时聚焦对应桌面会话；裸 `SessionStart` 不再错误标记为空闲任务。
+## [Unreleased]
 
 ### 新增
 

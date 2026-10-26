@@ -1,6 +1,5 @@
 'use strict';
 const fs = require('node:fs');
-const path = require('node:path');
 const { BridgeServer } = require('../bridge/bridgeServer');
 const { MAX_FRAME_BYTES, validateRequest, validateDecision, keyOf } = require('./contract');
 
@@ -14,18 +13,11 @@ class IntegrationHub extends BridgeServer {
     this.closed = new Map();
     this.sockets = new Set();
   }
-  // Best-effort discovery file: a missing or read-only user-data directory must
-  // never take down the host, because this write happens inside socket handlers.
   writeDescriptor() {
-    try {
-      fs.mkdirSync(path.dirname(this.descriptorPath), { recursive: true });
-      const tmp = this.descriptorPath + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify({ v: 2, pipe: this.pipeName, token: this.token, pid: process.pid, createdAt: this.startedAt }));
-      fs.renameSync(tmp, this.descriptorPath);
-      this.hardenDescriptor();
-    } catch (error) {
-      this.log('integration descriptor unavailable (' + (error && error.code ? error.code : 'write-failed') + '); clients fall back to the native configuration');
-    }
+    const tmp = this.descriptorPath + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ v: 2, pipe: this.pipeName, token: this.token, pid: process.pid, createdAt: this.startedAt }));
+    fs.renameSync(tmp, this.descriptorPath);
+    this.hardenDescriptor();
   }
   snapshot() { return [...this.pending.values()].map(r => ({ ...r.request })); }
   change() { this.onChange(this.snapshot()); }

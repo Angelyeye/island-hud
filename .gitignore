@@ -4,7 +4,6 @@ artifacts/
 *.log
 .DS_Store
 release/
-release-v0.3.2*/
 dist/
 out/
 *.zip

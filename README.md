@@ -83,7 +83,7 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 | `SHA256SUMS.txt` | **完整性校验**：包含所有产物的 SHA-256 校验值 |
 
 > [!NOTE]
-> 最新 Release 为 **v0.3.2**（DSH + ZCode + Claude Code + Codex）：ZCode 审批卡支持「始终允许」、第五轮审计加固（更新源校验、会话目录校验、设置窗口防护、渲染日志迁移）。从 v0.3.1 升级直接覆盖安装即可，设置与集成配置会保留。
+> 最新 Release 为 **v0.3.3**（DSH + ZCode + Claude Code + Codex）：设置页可直接选择灵动岛所在显示器、DSH 大日志启动/agent 启动卡顿修复、会话 IPC 去重与诊断日志批量写入、设置窗口拖动闪屏修复。从 v0.3.2 升级直接覆盖安装即可，设置与集成配置会保留。
 
 发布产物**尚未做代码签名**，Windows SmartScreen 可能提示未知发布者。请先用 `Get-FileHash` 核对 `SHA256SUMS.txt` 再运行；签名进度见 [代码签名策略](#代码签名策略)。
 

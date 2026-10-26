@@ -23,6 +23,7 @@ const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs
 const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
+const { loginItemEnabled } = require('./app/login-item-state.cjs');
 const { clientPath: zcodeClientPath, openWorkspace: zcodeOpenWorkspace } = require('./app/zcode-client.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -692,14 +693,7 @@ function loginItemOptions(extra = {}) {
 }
 function loginItemState() {
   try {
-    const s = app.getLoginItemSettings(loginItemOptions());
-    // Electron's `openAtLogin` is not reliable when a custom launch-item name is
-    // used; the launchItems list carries the authoritative path/enabled state.
-    if (Array.isArray(s.launchItems)) {
-      const exe = process.execPath.toLowerCase();
-      return s.launchItems.some((i) => i && i.enabled && i.path && i.path.toLowerCase() === exe);
-    }
-    return !!s.openAtLogin;
+    return loginItemEnabled(app.getLoginItemSettings(loginItemOptions()), process.execPath);
   } catch { return false; }
 }
 function setAutoStart(on) {

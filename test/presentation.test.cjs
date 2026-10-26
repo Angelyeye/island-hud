@@ -61,6 +61,21 @@ test('display targeting keeps a connected choice and falls back to the primary d
   assert.equal(P.normalize({ displayId: '2' }).displayId, null);
   assert.equal(P.normalize({}).displayId, null);
 });
+test('DSH repair status is requested only after the managed plugin is installed', () => {
+  assert.equal(P.dshRepairPending({ dshTimedQuestions: false }), false);
+  assert.equal(P.dshRepairPending({
+    dshTimedQuestions: true,
+    dsh: { installed: false, configuredTimedQuestions: false },
+  }), false);
+  assert.equal(P.dshRepairPending({
+    dshTimedQuestions: true,
+    dsh: { installed: true, configuredTimedQuestions: false },
+  }), true);
+  assert.equal(P.dshRepairPending({
+    dshTimedQuestions: true,
+    dsh: { installed: true, configuredTimedQuestions: true },
+  }), false);
+});
 test('local Markdown builds a node tree: text is escaped by construction, dangerous links stripped, never emits images and preserves code', () => {
   const walk = (node, out = { tags: [], hrefs: [], text: [] }) => {
     if (node === null || node === undefined || node === false || node === '') return out;

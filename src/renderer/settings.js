@@ -122,7 +122,7 @@
     catch (error) { status('恢复失败：' + error.message, true); }
   }
   async function save() {
-    try { fill(await api.set(values())); status('已保存' + (saved.dshTimedQuestions !== saved.dsh?.configuredTimedQuestions ? ' · 问答模式需安装 / 修复后重启 DSH' : '')); }
+    try { fill(await api.set(values())); status('已保存' + (P.dshRepairPending(saved) ? ' · 问答模式需安装 / 修复后重启 DSH' : '')); }
     catch (error) { status('保存失败：' + error.message, true); }
   }
   async function manageDsh(action) {

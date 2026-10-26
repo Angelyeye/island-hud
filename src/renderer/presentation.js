@@ -28,6 +28,10 @@
     result.displayId = Number.isInteger(result.displayId) ? result.displayId : null;
     return result;
   }
+  function dshRepairPending(value = {}) {
+    return value.dsh?.installed === true
+      && value.dshTimedQuestions !== value.dsh.configuredTimedQuestions;
+  }
   // Display IDs are runtime identifiers, not stable across reconnects. Keep the
   // chosen ID while it exists, then fall back to the primary display.
   function selectDisplay(displays, id, primary) {
@@ -193,5 +197,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, dshRepairPending, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
 });

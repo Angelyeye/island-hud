@@ -58,9 +58,50 @@ if (TEST_ROOT) {
   app.setName('Island HUD Development');
 }
 
+const LOG_MAX_BYTES = 1024 * 1024;
+const LOG_FLUSH_BYTES = 16 * 1024;
+let logPath = null, logSize = -1, logLines = [], logBytes = 0, logTimer = null;
+
+// Production diagnostics are batched: creating/stat-ing/appending one file per
+// line is synchronous disk work on the main thread, and bridge/integration
+// bursts can produce many lines. Test-only sinks below stay synchronous.
+function flushLog() {
+  if (logTimer) { clearTimeout(logTimer); logTimer = null; }
+  if (!logLines.length) return;
+  const chunk = logLines.join(''), bytes = logBytes;
+  logLines = []; logBytes = 0;
+  try {
+    if (!logPath) {
+      const dir = logDir();
+      fs.mkdirSync(dir, { recursive: true });
+      logPath = path.join(dir, 'app.log');
+    }
+    if (logSize < 0) {
+      try { logSize = fs.statSync(logPath).size; } catch { logSize = 0; }
+    }
+    if (logSize + bytes > LOG_MAX_BYTES) {
+      const rot = logPath + '.1';
+      try { fs.unlinkSync(rot); } catch { /* ignore */ }
+      try { fs.renameSync(logPath, rot); logSize = 0; } catch { /* keep appending */ }
+    }
+    fs.appendFileSync(logPath, chunk);
+    logSize += bytes;
+  } catch {
+    logPath = null; logSize = -1;
+  }
+}
+
+function appendLog(line) {
+  logLines.push(line); logBytes += Buffer.byteLength(line);
+  if (logBytes >= LOG_FLUSH_BYTES) { flushLog(); return; }
+  if (!logTimer) { logTimer = setTimeout(flushLog, 200); logTimer.unref?.(); }
+}
+process.once('exit', flushLog);
+
 function reportDiagnosticStreamFailure(name, error) {
   const code = error && typeof error.code === 'string' ? error.code : 'stream-error';
   appendLog(`${new Date().toISOString()} ${name} unavailable (${code}); continuing with file logging\n`);
+  flushLog();
 }
 
 // Keep these listeners for the whole process lifetime. A closed terminal or test
@@ -278,24 +319,6 @@ async function checkForUpdates({ interactive = false } = {}) {
 
 function logDir() {
   return TEST_ROOT ? path.join(TEST_ROOT, 'logs') : process.env.ISLAND_LOG_DIR || path.join(app.getPath('appData'), 'IslandHUD', 'logs');
-}
-
-function appendLog(line) {
-  try {
-    const dir = logDir();
-    fs.mkdirSync(dir, { recursive: true });
-    const file = path.join(dir, 'app.log');
-    const max = 1024 * 1024;
-    try {
-      const st = fs.statSync(file);
-      if (st.size > max) {
-        const rot = file + '.1';
-        try { fs.unlinkSync(rot); } catch { /* ignore */ }
-        fs.renameSync(file, rot);
-      }
-    } catch { /* first write */ }
-    fs.appendFileSync(file, line);
-  } catch { /* ignore */ }
 }
 
 function diag(msg) {
@@ -1088,6 +1111,7 @@ ipcMain.handle('island:clipboard:write', (_e, text) => {
 ipcMain.handle('island:logs:open', () => {
   try {
     fs.mkdirSync(logDir(), { recursive: true });
+    flushLog();
     shell.openPath(logDir());
     return true;
   } catch { return false; }
@@ -1152,13 +1176,20 @@ app.whenReady().then(() => {
   if (sessionsRoot && !path.isAbsolute(sessionsRoot)) throw new Error('Absolute DSH sessions path required');
   bridge = new DshBridge(sessionsRoot ? { sessionsRoot } : {});
   diag('zstd decoder=' + zstdDecoderName);
+  let lastBridgeLogAt = 0, lastBridgeCount = -1;
   bridge.on('update', (sessions) => {
     sessionStore.replaceProviderSnapshot('dsh', sessions);
-    const summary = sessions.map((s) => `${s.project}:${s.phase}`).join(', ');
-    diag('bridge ' + sessions.length + ' sessions [' + summary + ']');
-    if (win && !win.isDestroyed()) win.webContents.send('island:sessions', visibleSessions());
+    // Log session-count changes immediately, but throttle repeated phase/title
+    // churn. Sending is centralized in publishSessions so the 400ms timer does
+    // not immediately resend the same snapshot.
+    const now = Date.now();
+    if (sessions.length !== lastBridgeCount || now - lastBridgeLogAt >= 5000) {
+      const summary = sessions.map((s) => `${s.project}:${s.phase}`).join(', ');
+      diag('bridge ' + sessions.length + ' sessions [' + summary + ']');
+      lastBridgeCount = sessions.length; lastBridgeLogAt = now;
+    }
+    publishSessionsNow?.();
   });
-  bridge.start();
 
   if (!TEST_ROOT) {
     dshNavigation = new DshNavigationServer({ descriptorPath: navigationDescriptorPath(), log: diag });
@@ -1213,6 +1244,9 @@ app.whenReady().then(() => {
     },
   });
   integrationHub.start();
+  // Start DSH tailing only after publishSessions exists: bridge updates route
+  // through it so publishedSessions is kept in sync and duplicate IPC stops.
+  bridge.start();
   sessionPublishTimer = setInterval(publishSessions, 400);
 
   const toggleOverview = () => {
@@ -1266,4 +1300,5 @@ app.on('will-quit', () => {
   clearInterval(hitTestTimer);
   nativeTheme.removeListener('updated', publishEnvironment);
   completionReader.clear();
+  flushLog();
 });

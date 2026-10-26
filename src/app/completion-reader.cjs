@@ -34,7 +34,9 @@ class CompletionReader {
     return promise;
   }
   async scan(file, turn) {
-    const tail = new JsonlTail(file, { compressed: true, maxReadBytes: 256 * 1024, maxLineBytes: 8 * LIMIT });
+    // 64 KiB slices keep each synchronous decompression/parse slice short; the
+    // loop yields with setImmediate so a large transcript cannot freeze the UI.
+    const tail = new JsonlTail(file, { compressed: true, maxReadBytes: 64 * 1024, maxLineBytes: 8 * LIMIT });
     let current = 0, candidate = '', value = null;
     let readingTurn = false;
     for (;;) {

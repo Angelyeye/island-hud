@@ -3,9 +3,10 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const EventEmitter = require('node:events');
-const { JsonlTail } = require('../logs/jsonl-tail.cjs');
+const { JsonlTail, frameLength } = require('../logs/jsonl-tail.cjs');
 const { keyOf } = require('../integrations/contract');
 const SESSIONS_ROOT = path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'sessions');
+const ZSTD_MAGIC = 0xfd2fb528;
 const PHASE = { WAITING_APPROVAL: 'waitingForApproval', WAITING_ANSWER: 'waitingForAnswer', RUNNING: 'running', COMPLETED: 'completed', IDLE: 'idle' };
 const QUESTION_TOOLS = new Set(['ask_user_question', 'ask', 'AskUserQuestion']);
 const phaseRank = phase => ({ waitingForApproval: 0, waitingForAnswer: 1, running: 2, completed: 3, idle: 4 }[phase] ?? 4);
@@ -34,12 +35,62 @@ function makeSession(id, workspaceSlug, file) {
 class TranscriptTail extends JsonlTail { constructor(file, options = {}) { super(file, { ...options, compressed: true }); } }
 
 class DshBridge extends EventEmitter {
-  constructor({ pollMs = 400, staleMs = 30 * 60 * 1000, sessionsRoot = SESSIONS_ROOT, now = Date.now } = {}) {
-    super(); Object.assign(this, { pollMs, staleMs, sessionsRoot, now });
+  constructor({ pollMs = 400, staleMs = 30 * 60 * 1000, sessionsRoot = SESSIONS_ROOT, now = Date.now,
+    maxTickBytes = 64 * 1024, maxSessionBytes = 64 * 1024,
+    startupTailBytes = 64 * 1024, startupHeaderBytes = 4 * 1024 } = {}) {
+    super(); Object.assign(this, { pollMs, staleMs, sessionsRoot, now,
+      maxTickBytes, maxSessionBytes, startupTailBytes, startupHeaderBytes });
     this.sessions = new Map(); this.tails = new Map(); this.timer = null; this.lastSnapshot = null;
   }
   start() { if (this.timer) return; this.tick(); this.timer = setInterval(() => this.tick(), this.pollMs); }
   stop() { clearInterval(this.timer); this.timer = null; this.tails.clear(); this.sessions.clear(); }
+  // Large transcripts are only needed for their metadata and their latest
+  // state. Replaying megabytes through fzstd on the main thread on every
+  // startup is what made the app freeze; read a small header and the last
+  // window instead, then continue normal tailing from that frame boundary.
+  readHeader(file, bytes) {
+    try { return new TranscriptTail(file, { maxReadBytes: bytes }).poll(bytes); }
+    catch { return []; }
+  }
+  applyHeader(session, record) {
+    if (!record || typeof record.type !== 'string') return;
+    const d = record.type === 'session' ? record : record.data || {};
+    if (record.type === 'session') {
+      session.cwd = d.cwd || ''; session.project = session.cwd ? path.basename(session.cwd) : '';
+      session.startedAt = d.createdAt || Number(record.time) || session.startedAt;
+      session.delegationDepth = d.delegationDepth || 0;
+    } else if (record.type === 'session/title' && d.title) session.title = d.title;
+    else if (record.type === 'user/message') {
+      const text = humanizePrompt(textOf(d.content));
+      if (text && !looksSynthetic(text)) session.lastUserText = compact(text, 200);
+    }
+  }
+  validFrames(bytes, start) {
+    let at = start, frames = 0;
+    while (at < bytes.length) {
+      let length;
+      try { length = frameLength(bytes.subarray(at)); } catch { return false; }
+      if (length === null) return frames > 0;
+      at += length; frames++;
+    }
+    return frames > 0;
+  }
+  tailStart(file, size, windowBytes) {
+    if (!Number.isFinite(size) || size <= windowBytes) return 0;
+    let fd;
+    try {
+      fd = fs.openSync(file, 'r');
+      const buffer = Buffer.alloc(windowBytes);
+      const read = fs.readSync(fd, buffer, 0, windowBytes, size - windowBytes);
+      if (read < 8) return 0;
+      const bytes = buffer.subarray(0, read), base = size - read;
+      for (let at = 0; at + 4 <= bytes.length; at++) {
+        if (bytes.readUInt32LE(at) === ZSTD_MAGIC && this.validFrames(bytes, at)) return base + at;
+      }
+      return 0;
+    } catch { return 0; }
+    finally { if (fd !== undefined) try { fs.closeSync(fd); } catch { /* already closed */ } }
+  }
   scan() {
     let workspaces; try { workspaces = fs.readdirSync(this.sessionsRoot, { withFileTypes: true }); } catch { return; }
     for (const ws of workspaces) {
@@ -51,16 +102,35 @@ class DshBridge extends EventEmitter {
         const file = path.join(dir, entry.name, 'session.v4.jsonl.zstd');
         let stat; try { stat = fs.statSync(file); } catch { continue; }
         if (this.now() - stat.mtimeMs > this.staleMs) continue;
-        this.tails.set(entry.name, new TranscriptTail(file));
-        this.sessions.set(entry.name, makeSession(entry.name, ws.name, file));
+        const session = makeSession(entry.name, ws.name, file);
+        let start = 0;
+        if (stat.size > this.startupTailBytes + this.startupHeaderBytes) {
+          for (const record of this.readHeader(file, this.startupHeaderBytes)) {
+            try { this.applyHeader(session, record); } catch { /* malformed header record */ }
+          }
+          start = this.tailStart(file, stat.size, this.startupTailBytes);
+        }
+        if (!session.startedAt) session.startedAt = stat.birthtimeMs || stat.mtimeMs || this.now();
+        if (start > 0) session.updatedAt = Math.max(session.updatedAt, stat.mtimeMs || 0);
+        const tail = new TranscriptTail(file, { startOffset: start });
+        tail.mtimeMs = stat.mtimeMs;
+        this.tails.set(entry.name, tail);
+        this.sessions.set(entry.name, session);
       }
     }
   }
   tick() {
     this.scan();
-    for (const [id, tail] of this.tails) {
+    // Newest transcripts first: an active agent gets the budget it needs, while
+    // idle history waits. The budget caps synchronous read/decompress work on
+    // the main thread; whatever is left is resumed on the next tick.
+    const entries = [...this.tails.entries()].sort((a, b) => (b[1].mtimeMs || 0) - (a[1].mtimeMs || 0));
+    let budget = Math.max(0, this.maxTickBytes);
+    for (const [id, tail] of entries) {
+      if (budget <= 0) break;
       const generation = tail.generation;
-      const records = tail.poll();
+      const records = tail.poll(Math.min(this.maxSessionBytes, budget));
+      budget -= Math.min(tail.lastReadBytes || 0, budget);
       let session = this.sessions.get(id);
       if (generation !== tail.generation) {
         session = makeSession(id, session.workspaceSlug, session.file);

@@ -107,16 +107,20 @@ class JsonlDecoder {
 // Bounded reads, identity checks and two small anchors also detect truncation
 // followed by regrowth between polls, including a rewrite with the same size.
 class JsonlTail {
-  constructor(file, { compressed = false, maxReadBytes = 1024 * 1024, ...options } = {}) {
+  // startOffset must be a frame boundary for compressed files; it lets large
+  // transcripts resume near their current state instead of replaying history.
+  constructor(file, { compressed = false, maxReadBytes = 1024 * 1024, startOffset = 0, ...options } = {}) {
     this.file = file;
     this.maxReadBytes = maxReadBytes;
     this.decoder = new JsonlDecoder({ compressed, ...options });
     this.generation = 0;
-    this.offset = 0;
+    this.offset = Number.isInteger(startOffset) && startOffset > 0 ? startOffset : 0;
     this.identity = null;
     this.prefix = Buffer.alloc(0);
     this.anchor = Buffer.alloc(0);
     this.caughtUp = false;
+    this.lastReadBytes = 0;
+    this.mtimeMs = 0;
   }
   reset(reason) {
     this.generation++;
@@ -129,19 +133,22 @@ class JsonlTail {
     const bytes = Buffer.alloc(length);
     return bytes.subarray(0, fs.readSync(fd, bytes, 0, length, position));
   }
-  poll() {
+  poll(maxBytes = this.maxReadBytes) {
     let fd;
     try {
       fd = fs.openSync(this.file, 'r');
       const stat = fs.fstatSync(fd);
+      this.mtimeMs = stat.mtimeMs;
       const identity = `${stat.dev}:${stat.ino}:${stat.birthtimeMs}`;
       if (this.identity !== null && identity !== this.identity) this.reset('replaced');
       else if (stat.size < this.offset) this.reset('truncated');
       else if (this.offset && (!this.read(fd, this.prefix.length, 0).equals(this.prefix) ||
           !this.read(fd, this.anchor.length, this.offset - this.anchor.length).equals(this.anchor))) this.reset('rewritten');
       this.identity = identity;
-      const length = Math.min(stat.size - this.offset, this.maxReadBytes);
+      const limit = Number.isFinite(maxBytes) ? Math.max(0, maxBytes) : this.maxReadBytes;
+      const length = Math.min(stat.size - this.offset, limit);
       const bytes = length ? this.read(fd, length, this.offset) : Buffer.alloc(0);
+      this.lastReadBytes = bytes.length;
       this.offset += bytes.length;
       this.caughtUp = this.offset >= stat.size;
       this.prefix = this.read(fd, Math.min(64, this.offset), 0);
@@ -149,6 +156,7 @@ class JsonlTail {
       return this.decoder.push(bytes);
     } catch (error) {
       this.caughtUp = false;
+      this.lastReadBytes = 0;
       if (error.code === 'ENOENT' && this.identity !== null) this.reset('missing');
       return [];
     } finally { if (fd !== undefined) fs.closeSync(fd); }

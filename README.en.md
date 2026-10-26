@@ -226,7 +226,7 @@ Local data lives in `%LOCALAPPDATA%\IslandHUD`:
 | <kbd>Esc</kbd> | Collapse the currently expanded panel (does not deny or cancel the original request) |
 | <kbd>Ctrl</kbd> + <kbd>Enter</kbd> | Confirm submission on the question review page (not triggered while an IME composition is active) |
 
-The tray context menu also offers: re-center, switch display, auto-hide in fullscreen, open the log directory, and copy diagnostics. The settings page has five tabs — **General / Display and motion / Integrations / Shortcuts / Diagnostics and about** (通用 / 显示与动效 / 集成 / 快捷键 / 诊断与关于) — and appearance changes preview live.
+The tray context menu also offers: re-center, switch display, auto-hide in fullscreen, open the log directory, and copy diagnostics. The Display and motion tab also lets you choose the target display: follow the primary display or any connected screen, with automatic fallback when it disconnects. The settings page has five tabs — **General / Display and motion / Integrations / Shortcuts / Diagnostics and about** (通用 / 显示与动效 / 集成 / 快捷键 / 诊断与关于) — and appearance changes preview live.
 
 ## Frequently asked questions
 

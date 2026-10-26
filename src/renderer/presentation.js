@@ -7,7 +7,7 @@
   const DEFAULTS = Object.freeze({ panelDensity: 'comfortable', contentFontSize: 13, maxPanelHeight: 560,
     expandOnHover: true, autoCollapseOnLeave: true, completionReveal: 'glance', completionView: 'markdown-summary',
     completionDwellMs: 5000, motionMode: 'system', settingsTheme: 'system', autoHideWhenIdle: false,
-    approvalHandoffSeconds: 0 });
+    approvalHandoffSeconds: 0, displayId: null });
   const choices = { panelDensity: ['comfortable', 'compact'], completionReveal: ['glance', 'expanded'],
     completionView: ['markdown-summary', 'text-summary', 'full'], motionMode: ['system', 'reduced', 'full'],
     settingsTheme: ['system', 'dark', 'light'] };
@@ -25,7 +25,18 @@
     // Opt-in handoff: 0 keeps the island waiting (default); otherwise the
     // card counts down and returns the request to the client's native UI.
     result.approvalHandoffSeconds = Math.round(Math.max(0, Math.min(120, result.approvalHandoffSeconds)));
+    result.displayId = Number.isInteger(result.displayId) ? result.displayId : null;
     return result;
+  }
+  // Display IDs are runtime identifiers, not stable across reconnects. Keep the
+  // chosen ID while it exists, then fall back to the primary display.
+  function selectDisplay(displays, id, primary) {
+    const list = Array.isArray(displays) ? displays : [];
+    if (Number.isInteger(id)) {
+      const selected = list.find(display => display.id === id);
+      if (selected) return selected;
+    }
+    return primary || list[0] || null;
   }
   function geometry(input = {}, environment = {}) {
     const settings = normalize(input), compact = settings.panelDensity === 'compact';
@@ -182,5 +193,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, geometry, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
 });

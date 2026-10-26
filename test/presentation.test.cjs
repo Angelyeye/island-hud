@@ -47,6 +47,20 @@ test('layout uses logical pixels and bounds both density modes inside a small wo
   assert.equal(P.normalize({ approvalHandoffSeconds: 0 }).approvalHandoffSeconds, 0);
   assert.equal(P.normalize({ approvalHandoffSeconds: 7.6 }).approvalHandoffSeconds, 8);
 });
+test('display targeting keeps a connected choice and falls back to the primary display', () => {
+  const primary = { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
+  const secondary = { id: 2, bounds: { x: 1920, y: 0, width: 2560, height: 1440 } };
+  assert.equal(P.selectDisplay([primary, secondary], 2, primary), secondary);
+  assert.equal(P.selectDisplay([primary, secondary], 99, primary), primary);
+  assert.equal(P.selectDisplay([primary, secondary], null, primary), primary);
+  assert.equal(P.selectDisplay([], 2, primary), primary);
+  assert.equal(P.selectDisplay('not-a-list', 2, primary), primary);
+  assert.equal(P.normalize({ displayId: 2 }).displayId, 2);
+  assert.equal(P.normalize({ displayId: -1 }).displayId, -1);
+  assert.equal(P.normalize({ displayId: 2.5 }).displayId, null);
+  assert.equal(P.normalize({ displayId: '2' }).displayId, null);
+  assert.equal(P.normalize({}).displayId, null);
+});
 test('local Markdown builds a node tree: text is escaped by construction, dangerous links stripped, never emits images and preserves code', () => {
   const walk = (node, out = { tags: [], hrefs: [], text: [] }) => {
     if (node === null || node === undefined || node === false || node === '') return out;

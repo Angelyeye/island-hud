@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, clipboard } = require('electron');
+const { app, BrowserWindow, clipboard, screen } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -52,6 +52,11 @@ app.whenReady().then(async () => {
     const settingsJS = source => settingsWindow.webContents.executeJavaScript(source);
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
     assert.equal(overlay.isAlwaysOnTop(), false);
+    const primaryId = screen.getPrimaryDisplay().id;
+    const displayOptions = await settingsJS('[...document.querySelectorAll("#displayId option")].map(option => ({ value: option.value, text: option.textContent }))');
+    assert.ok(displayOptions.some(option => option.value === 'auto'));
+    assert.ok(displayOptions.some(option => option.value === String(primaryId) && /主显示器/.test(option.text)));
+    assert.equal(await settingsJS('document.querySelector("#displayId").value'), 'auto');
     await settingsJS('document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="dark";document.querySelector("#settingsTheme").dispatchEvent(new Event("input",{bubbles:true}))');
     assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
     assert.equal(await settingsJS('document.body.classList.contains("light")'), false);
@@ -67,10 +72,13 @@ app.whenReady().then(async () => {
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
     assert.equal(overlay.isAlwaysOnTop(), false);
     const liveWidthBeforeSave = overlay.getBounds().width;
-    await settingsJS('document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="light";document.querySelector("#save").click()');
+    await settingsJS(`document.querySelector("#displayId").value="${primaryId}";document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="light";document.querySelector("#save").click()`);
     await until(() => js('window.__islandApp.getState().layout.width===440'));
-    assert.equal((await js('window.island.settings.get()')).settingsVersion, 3);
+    const savedSettings = await js('window.island.settings.get()');
+    assert.equal(savedSettings.settingsVersion, 3);
+    assert.equal(savedSettings.displayId, primaryId);
     assert.equal(overlay.getBounds().width, liveWidthBeforeSave);
+    checks.push('display selector lists the primary display and persists the chosen display ID');
     checks.push('saved appearance broadcasts immediately and persists version-3 settings without resizing the live island while settings is open');
     fs.writeFileSync(path.join(root, 'settings-light.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-light.png');
     const before = clipboard.readText();

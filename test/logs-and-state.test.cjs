@@ -3,6 +3,7 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { randomUUID } = require('node:crypto');
 const { zstdCompressSync } = require('node:zlib');
 const { JsonlDecoder, JsonlTail, frameLength } = require('../src/logs/jsonl-tail.cjs');
 const { DshBridge, PHASE } = require('../src/dsh/dshBridge');
@@ -21,6 +22,23 @@ function session(t, records = []) {
   fs.writeFileSync(file, encode([{ type: 'session', cwd: path.join(root, '中文 项目'), createdAt: now }, ...records.map(row => ({ time: now, ...row }))]));
   const bridge = new DshBridge({ sessionsRoot: root, now: () => now });
   return { bridge, file, advance: ms => { now += ms; }, now: () => now };
+}
+// A multi-frame transcript larger than the startup header+tail window. The
+// unresolved approval sits in the middle, outside both bounds.
+function largeSession(root, id, turn, now = Date.now()) {
+  const file = path.join(root, 'workspace-' + id, id, 'session.v4.jsonl.zstd');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const chunks = [encode([{ type: 'session', cwd: path.join(root, 'workspace-' + id, 'project'), createdAt: now },
+    { type: 'session/title', data: { title: 'header-' + id } }])];
+  const fill = base => encode(Array.from({ length: 10 }, (_, i) => ({ type: 'assistant/message', time: base + i,
+    data: { content: [{ type: 'text', text: randomUUID() + randomUUID() }] } })));
+  for (let i = 0; i < 60; i++) chunks.push(fill(now + i * 10));
+  chunks.push(encode([{ type: 'approval/asked', time: now + 500, data: { id: 'old-' + id } }]));
+  for (let i = 60; i < 360; i++) chunks.push(fill(now + i * 10));
+  chunks.push(encode([{ type: 'turn/start', time: now + 1000, data: { turn } },
+    { type: 'tool/call', time: now + 1001, data: { callId: 'tail-call', name: 'bash', arguments: '{"command":"echo tail"}' } }]));
+  fs.writeFileSync(file, Buffer.concat(chunks));
+  return { file, size: fs.statSync(file).size, now };
 }
 
 test('partial compressed frame and partial JSON/UTF-8 across frames remain uncommitted until complete', () => {
@@ -109,4 +127,33 @@ test('replaced transcript removes old title and pending approval state', t => {
   fs.renameSync(replacement, f.file); f.bridge.tick();
   assert.equal(f.bridge.snapshot()[0].pendingApprovals.length, 0);
   assert.notEqual(f.bridge.snapshot()[0].title, 'old-title');
+});
+test('large transcripts start from a bounded tail and recover current state without replaying history', t => {
+  const root = fixture(t), large = largeSession(root, 'session-1', 9);
+  assert.ok(large.size > 128 * 1024, 'fixture must exceed the startup header+tail window');
+  const bridge = new DshBridge({ sessionsRoot: root, now: () => large.now + 3000 });
+  bridge.tick();
+  const tail = bridge.tails.get('session-1');
+  assert.ok(tail.offset > 64 * 1024, 'tail must not start at the beginning of a large transcript');
+  assert.equal(tail.offset, large.size);
+  assert.ok(tail.lastReadBytes <= 64 * 1024, 'first tick must respect the byte budget');
+  const state = bridge.snapshot()[0];
+  assert.equal(state.phase, PHASE.RUNNING);
+  assert.equal(state.turn, 9);
+  assert.equal(state.currentTool?.name, 'bash');
+  assert.equal(state.title, 'header-session-1');
+  assert.equal(state.pendingApprovals.length, 0, 'an old middle approval must not be resurrected by the header/tail skip');
+});
+test('a tick spends at most the configured budget across multiple large sessions', t => {
+  const root = fixture(t), first = largeSession(root, 'a', 1), second = largeSession(root, 'b', 2);
+  const bridge = new DshBridge({ sessionsRoot: root, now: () => Math.max(first.now, second.now) + 3000,
+    maxTickBytes: 32 * 1024, maxSessionBytes: 32 * 1024 });
+  bridge.tick();
+  const tails = [...bridge.tails.values()];
+  assert.equal(tails.length, 2);
+  assert.ok(tails.reduce((sum, tail) => sum + tail.lastReadBytes, 0) <= 32 * 1024);
+  assert.ok(tails.some(tail => tail.lastReadBytes > 0));
+  for (let i = 0; i < 8 && tails.some(tail => !tail.caughtUp); i++) bridge.tick();
+  assert.ok(tails.every(tail => tail.caughtUp));
+  assert.equal(bridge.snapshot().length, 2);
 });

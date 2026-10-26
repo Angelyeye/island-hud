@@ -5,10 +5,31 @@
   const disposers = [];
   let saved = null, environment = { dark: true }, busy = false, previewReady = false;
   const status = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' error' : ''); };
+  function displayValue() {
+    const selected = $('displayId').value;
+    if (selected === 'auto' || !selected) return null;
+    const id = Number(selected);
+    return Number.isInteger(id) ? id : null;
+  }
   function values() {
     const value = {};
     for (const key of fields) { const el = $(key); value[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? Number(el.value) : el.value; }
-    return { ...value, updateUrl: $('updateUrl').value.trim(), autoCheckUpdates: $('autoCheck').checked };
+    return { ...value, displayId: displayValue(), updateUrl: $('updateUrl').value.trim(), autoCheckUpdates: $('autoCheck').checked };
+  }
+  function renderDisplays(value, selected = $('displayId').value) {
+    const select = $('displayId'), options = Array.isArray(value.displayOptions) ? value.displayOptions : [];
+    select.textContent = '';
+    select.append(new Option('跟随主显示器', 'auto'));
+    for (const display of options) {
+      const scale = display.scaleFactor && display.scaleFactor !== 1 ? ' · ' + Math.round(display.scaleFactor * 100) + '%' : '';
+      const prefix = display.index ? display.index + '. ' : '';
+      const label = `${prefix}${display.label || '显示器'} · ${display.width}×${display.height}${scale}${display.primary ? ' · 主显示器' : ''}`;
+      select.append(new Option(label, String(display.id)));
+    }
+    if (selected && selected !== 'auto' && !options.some(display => String(display.id) === selected)) {
+      select.append(new Option('已断开的显示器（临时使用主显示器）', selected));
+    }
+    select.value = [...select.options].some(option => option.value === selected) ? selected : 'auto';
   }
   function theme(value) { document.body.classList.toggle('light', value.settingsTheme === 'light' || value.settingsTheme === 'system' && !environment.dark); }
   function preview() {
@@ -24,6 +45,7 @@
     for (const key of fields) { const el = $(key), item = value[key] ?? P.DEFAULTS[key] ?? false; if (el.type === 'checkbox') el.checked = !!item; else el.value = item; }
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
+    renderDisplays(value, value.displayId == null ? 'auto' : String(value.displayId));
     updateDsh(value.dsh); updateZcode(value.zcode); updateClaude(value.claude); updateCodex(value.codex); preview();
   }
   function updateDsh(value) {
@@ -175,8 +197,13 @@
     loadHidden('archive'); loadHidden('delete');
     disposers.push(sessionApi.onChange(() => { loadHidden('archive'); loadHidden('delete'); }));
   }
-  window.island.environment?.get().then(value => { environment = value; if (saved) preview(); }).catch(() => {});
-  disposers.push(window.island.environment?.onChange(value => { environment = value; if (saved) preview(); }));
+  const applyEnvironment = value => {
+    environment = value;
+    if (saved) preview();
+    if (value?.displayOptions) renderDisplays(value);
+  };
+  window.island.environment?.get().then(applyEnvironment).catch(() => {});
+  disposers.push(window.island.environment?.onChange(applyEnvironment));
   const timer = setInterval(() => {
     if (busy || document.visibilityState === 'hidden') return;
     api.dshStatus().then(updateDsh).catch(() => {});

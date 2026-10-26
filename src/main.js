@@ -189,7 +189,20 @@ function visibleSessions() {
 
 function targetDisplay() {
   const displays = screen.getAllDisplays();
-  return displays.find((d) => d.id === settings.displayId) || screen.getPrimaryDisplay();
+  return presentation.selectDisplay(displays, settings.displayId, screen.getPrimaryDisplay()) || screen.getPrimaryDisplay();
+}
+
+function displayChoices() {
+  const primary = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().map((display, index) => ({
+    id: display.id,
+    index: index + 1,
+    label: display.label || '显示器',
+    width: display.bounds.width,
+    height: display.bounds.height,
+    scaleFactor: display.scaleFactor,
+    primary: display.id === primary.id,
+  }));
 }
 
 /* ----------------------------------------------------------------- updater */
@@ -323,7 +336,8 @@ let lastEnvironment = '';
 
 function environmentPayload() {
   const display = targetDisplay();
-  return { workArea: display.workArea, scaleFactor: display.scaleFactor, dark: nativeTheme.shouldUseDarkColors,
+  return { workArea: display.workArea, scaleFactor: display.scaleFactor, displayOptions: displayChoices(),
+    dark: nativeTheme.shouldUseDarkColors,
     reducedMotion: systemPreferences.getAnimationSettings().shouldRenderRichAnimation === false, visible: visible && !!win?.isVisible(), windowBounds: win?.getBounds() || null };
 }
 function publishEnvironment() {
@@ -677,9 +691,9 @@ function setAutoStart(on) {
 }
 
 function displayMenuItems() {
-  const current = targetDisplay();
+  const current = targetDisplay(), primary = screen.getPrimaryDisplay();
   return screen.getAllDisplays().map((d, i) => ({
-    label: `显示器 ${i + 1} · ${d.size.width}×${d.size.height}${d.id === current.id ? '（当前）' : ''}`,
+    label: `${i + 1}. ${d.label || '显示器'} · ${d.size.width}×${d.size.height}${d.id === primary.id ? ' · 主显示器' : ''}${d.id === current.id ? '（当前）' : ''}`,
     type: 'radio',
     checked: d.id === current.id,
     click: () => {
@@ -837,6 +851,7 @@ function settingsPayload() {
     claude: claudeIntegration.status(),
     codex: codexIntegration.status(),
     displays: screen.getAllDisplays().length,
+    displayOptions: displayChoices(),
     autoStart: !TEST_ROOT && app.isPackaged ? loginItemState() : false,
   };
 }

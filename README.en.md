@@ -83,7 +83,7 @@ All clients share the same loopback channel and the same island. The list sorts 
 | `SHA256SUMS.txt` | **Integrity check**: SHA-256 checksums for every artifact |
 
 > [!NOTE]
-> The latest release is **v0.3.1** (DSH + ZCode + Claude Code + Codex): clicking a ZCode session now focuses the desktop client on that workspace, corrected session-status semantics, and enforced attribute safety at the DOM boundary. To upgrade from v0.3.0, simply install over it — settings and integration config are preserved.
+> The latest release is **v0.3.2** (DSH + ZCode + Claude Code + Codex): always-allow decisions on ZCode approval cards, plus fifth-round audit hardening (update-source validation, session-directory checks, settings-window guards, renderer log migration). To upgrade from v0.3.1, simply install over it — settings and integration config are preserved.
 
 Release artifacts **are not code-signed yet**, so Windows SmartScreen may warn about an unknown publisher. Verify `SHA256SUMS.txt` with `Get-FileHash` before running anything; see the [code signing policy](#code-signing-policy) for progress.
 

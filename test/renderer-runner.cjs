@@ -4,6 +4,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 if (!root || !path.isAbsolute(root)) throw new Error('Absolute test root required');
 fs.mkdirSync(root, { recursive: true }); app.setPath('userData', path.join(root, 'electron'));
@@ -73,7 +74,7 @@ app.whenReady().then(async () => {
     assert.ok(Math.abs(compact.top - 42) <= 1, JSON.stringify(compact));
     assert.ok(compact.left >= 8 && compact.right <= compact.width - 8 && compact.bottom <= compact.height - 8);
     win.showInactive();
-    fs.writeFileSync(path.join(root, 'navigation-toast.png'), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot(win, path.join(root, 'navigation-toast.png'));
     checks.push('unsupported-session toast is short, stays within the overlay and follows the animated island back to compact height');
     navigationResult = { status: 'navigated', sessionId: list[2].rawId };
     await js('void window.__islandApp.focusTerminal(window.__islandApp.getSessions()[2])');
@@ -151,7 +152,7 @@ app.whenReady().then(async () => {
     await until(() => js('document.querySelector("#toast").textContent.includes("会话仍在进行")'));
     assert.equal(await js('window.__islandApp.getSessions().length'), 1);
     checks.push('a running session cannot be hidden and the island explains why');
-    fs.writeFileSync(path.join(root, 'sessions.png'), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot(win, path.join(root, 'sessions.png'));
     fs.writeFileSync(path.join(root, 'renderer-result.json'), JSON.stringify({ status: 'passed', checks, electron: process.versions.electron }, null, 2));
   } catch (error) {
     fs.writeFileSync(path.join(root, 'renderer-result.json'), JSON.stringify({ status: 'failed', checks, error: error.stack }, null, 2)); process.exitCode = 1;

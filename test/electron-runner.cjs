@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { exchange } = require('../src/integrations/client');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 const descriptor = path.join(root, 'integration-v2.json');
 const results = [];
@@ -76,7 +77,7 @@ app.whenReady().then(async () => {
     await click('next'); await click('next');
     assert.match(await js('document.querySelector(".native-review").textContent'), /中文验收 019/);
     await pause(600);
-    fs.writeFileSync(path.join(root, 'native-questions.png'), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot(win, path.join(root, 'native-questions.png'));
     await click('submit');
     assert.deepEqual((await batch).answers, [{ id: 'single', selected: ['B'] }, { id: 'multi', selected: ['X','Z'], custom: '中文验收 019' }, { id: 'text', selected: [], custom: '自由回答' }]);
     results.push('question pagination and review preserve single, multiple and Chinese text answers by stable question ID');
@@ -91,7 +92,7 @@ app.whenReady().then(async () => {
     await until(async () => (await js('window.island.native.snapshot()')).length === 2);
     assert.equal(await js('window.__islandApp.getState().scene'), 'approval');
     await pause(600);
-    fs.writeFileSync(path.join(root, 'native-approval.png'), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot(win, path.join(root, 'native-approval.png'));
     await js('document.querySelector("[data-native-action=allow]").dispatchEvent(new MouseEvent("mousedown",{bubbles:true,button:0}))');
     assert.equal((await allow).decision, 'allow');
     await until(async () => (await js('window.island.native.snapshot()'))[0]?.requestId === 'second-request');

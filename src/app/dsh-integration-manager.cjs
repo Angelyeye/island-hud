@@ -8,6 +8,18 @@ const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const encoded = value => JSON.stringify(value, null, 2) + '\n';
 const samePath = (a, b) => process.platform === 'win32'
   ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase() : path.resolve(a) === path.resolve(b);
+// Removes a managed link without ever touching the directory it points at.
+// Windows filesystems can report a junction as a directory and refuse the
+// RemoveFile that unlink uses, so fall back to rmdir (which only removes the
+// link itself, and fails on a real non-empty directory instead of deleting it).
+function removeLink(file) {
+  try {
+    fs.unlinkSync(file);
+  } catch (error) {
+    if (error.code !== 'EPERM' && error.code !== 'EACCES' && error.code !== 'EISDIR') throw error;
+    fs.rmdirSync(file);
+  }
+}
 function atomic(file, bytes) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const temp = file + '.' + randomUUID() + '.tmp';
@@ -57,8 +69,14 @@ class DshIntegrationManager {
   readLink() {
     let stat;
     try { stat = fs.lstatSync(this.link); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
-    if (!stat.isSymbolicLink()) throw new Error('The DSH bridge package is not a managed local link; remove it in DSH before replacing it');
-    return path.resolve(path.dirname(this.link), fs.readlinkSync(this.link));
+    if (stat.isSymbolicLink()) return path.resolve(path.dirname(this.link), fs.readlinkSync(this.link));
+    // Sandboxed and filtered Windows filesystems can expose a junction to lstat as
+    // a plain directory while the native resolver still follows the reparse point.
+    try {
+      const resolved = fs.realpathSync.native(this.link);
+      if (!samePath(resolved, this.link)) return resolved;
+    } catch { /* fall through to the explicit error */ }
+    throw new Error('The DSH bridge package is not a managed local link; remove it in DSH before replacing it');
   }
   replaceLink(target) {
     const current = this.readLink();
@@ -69,8 +87,8 @@ class DshIntegrationManager {
     if (current) fs.renameSync(this.link, old);
     try { if (target) fs.renameSync(temp, this.link); }
     catch (error) { if (current) fs.renameSync(old, this.link); throw error; }
-    finally { if (fs.existsSync(temp)) fs.unlinkSync(temp); }
-    if (current) fs.unlinkSync(old); // Removes the link itself, never its target directory.
+    finally { if (fs.existsSync(temp)) removeLink(temp); }
+    if (current) removeLink(old); // Removes the link itself, never its target directory.
   }
   state() {
     if (!fs.existsSync(this.stateFile)) return null;

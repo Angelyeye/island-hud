@@ -25,9 +25,10 @@ async function main() {
     if (entry === 'resources') continue;
     fs.cpSync(path.join(electron, entry), path.join(portable, entry === 'electron.exe' ? 'IslandHUD.exe' : entry), { recursive: true });
   }
-  const omitted = new Set();
+  // probe/ and the test-only input-helper binary never ship to users.
+  const omitted = new Set(['probe', 'input-helper.exe', 'input-helper-build.json']);
   fs.cpSync(path.join(root, 'src'), path.join(appRoot, 'src'), { recursive: true,
-    filter: source => !omitted.has(path.basename(source)) && path.basename(source) !== 'probe' });
+    filter: source => !omitted.has(path.basename(source)) });
   fs.cpSync(path.join(root, 'integrations/dsh'), path.join(appRoot, 'integrations/dsh'), { recursive: true });
   fs.cpSync(path.join(root, 'integrations/zcode'), path.join(appRoot, 'integrations/zcode'), { recursive: true });
   fs.cpSync(path.join(root, 'integrations/claude'), path.join(appRoot, 'integrations/claude'), { recursive: true });

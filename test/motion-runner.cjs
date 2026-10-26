@@ -3,6 +3,7 @@
 const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 if (!root || !path.isAbsolute(root)) throw new Error('Absolute isolated root required');
 fs.mkdirSync(root, { recursive: true }); app.setPath('userData', path.join(root, 'electron'));
@@ -21,7 +22,7 @@ app.whenReady().then(async () => {
       const count = scene === 'compact' ? 12 : 9;
       for (let i = 0; i < count; i++) {
         const file = 'frame-' + String(frames.length).padStart(3, '0') + '.png';
-        fs.writeFileSync(path.join(root, file), (await win.webContents.capturePage()).toPNG());
+        await saveScreenshot(win, path.join(root, file));
         frames.push({ file, scene }); await pause(40);
       }
     }

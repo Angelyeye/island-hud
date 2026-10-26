@@ -3,6 +3,7 @@ const { app } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 if (!root || !path.isAbsolute(root)) throw new Error('Absolute test root required');
 let win;
@@ -40,10 +41,16 @@ app.whenReady().then(async () => {
     await js('document.querySelector("#dshRemove").click()');
     await until(() => js('document.querySelector("#status").textContent === "DSH 集成卸载完成"'));
     assert.deepEqual(JSON.parse(fs.readFileSync(manifest, 'utf8')), initial);
-    fs.writeFileSync(path.join(root, 'settings-dsh.png'), (await win.webContents.capturePage()).toPNG());
+    await saveScreenshot(win, path.join(root, 'settings-dsh.png'));
     checks.push('actual settings buttons install and remove DSH integration in an isolated profile while preserving another plugin');
     fs.writeFileSync(path.join(root, 'application-result.json'), JSON.stringify({ status: 'passed', checks, electron: process.versions.electron }, null, 2));
   } catch (error) {
-    fs.writeFileSync(path.join(root, 'application-result.json'), JSON.stringify({ status: 'failed', checks, error: error.stack }, null, 2)); process.exitCode = 1;
+    // Surface the settings surface state: a bare timeout hides whether the click
+    // reported an error or the UI simply never settled.
+    const dom = await win?.webContents?.executeJavaScript(`(() => {
+      const pick = selector => document.querySelector(selector)?.textContent || null;
+      return { status: pick('#status'), badge: pick('#dshStatus'), output: pick('#dshOutput') };
+    })()`).catch(() => null);
+    fs.writeFileSync(path.join(root, 'application-result.json'), JSON.stringify({ status: 'failed', checks, error: error.stack, dom }, null, 2)); process.exitCode = 1;
   } finally { app.quit(); }
 });

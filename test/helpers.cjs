@@ -17,4 +17,18 @@ async function until(check, ms = 3000) {
   const start = Date.now();
   while (!check()) { if (Date.now() - start > ms) throw new Error('Timed out waiting for condition'); await new Promise(r => setTimeout(r, 10)); }
 }
-module.exports = { fixture, until };
+// Diagnostic screenshots are artifacts, not assertions. Compositor capture can
+// fail transiently (UnknownVizError) on GPU-less or remote sessions, so retry a
+// few times and let the run continue when the host simply cannot capture.
+async function saveScreenshot(win, file, attempts = 4) {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      fs.writeFileSync(file, (await win.webContents.capturePage()).toPNG());
+      return true;
+    } catch {
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  }
+  return false;
+}
+module.exports = { fixture, until, saveScreenshot };

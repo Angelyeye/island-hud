@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const { exchange } = require('../src/integrations/client');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 const checks = [], screenshots = [];
 let overlay;
@@ -55,7 +56,7 @@ app.whenReady().then(async () => {
     assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
     assert.equal(await settingsJS('document.body.classList.contains("light")'), false);
     await pause(300);
-    fs.writeFileSync(path.join(root, 'settings-dark-preview.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-dark-preview.png');
+    await saveScreenshot(settingsWindow, path.join(root, 'settings-dark-preview.png')); screenshots.push('settings-dark-preview.png');
     settingsWindow.close(); await pause(150);
     assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
     checks.push('unsaved settings preview uses the real renderer and cancellation leaves the live density unchanged');
@@ -65,7 +66,7 @@ app.whenReady().then(async () => {
     await until(() => js('window.__islandApp.getState().layout.width===440'));
     assert.equal((await js('window.island.settings.get()')).settingsVersion, 3);
     checks.push('saved appearance broadcasts immediately, resizes the overlay and persists version-3 settings');
-    fs.writeFileSync(path.join(root, 'settings-light.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-light.png');
+    await saveScreenshot(settingsWindow, path.join(root, 'settings-light.png')); screenshots.push('settings-light.png');
     const before = clipboard.readText();
     await settingsJS('document.querySelector("#copyDiag").click()'); await until(() => clipboard.readText() !== before);
     assert.match(clipboard.readText(), /Island HUD/);

@@ -5,9 +5,9 @@ const { app } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
-const { execFileSync, execFile } = require('node:child_process');
 const { exchange } = require('../src/integrations/client');
-
+const windowsInput = require('./windows-input.cjs');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 const descriptor = path.join(root, 'integration-v2.json');
 const resultFile = path.join(root, 'windows-input-result.json');
@@ -23,48 +23,25 @@ async function until(check, timeout = 8000) {
   throw new Error('GUI condition timed out');
 }
 
-async function clickAt(x, y) {
-  // Renderer/window coordinates are DIP. Windows mouse input uses physical
-  // pixels, including when Chromium is exercising a forced DPI scale.
-  const physical = require('electron').screen.dipToScreenPoint({ x: Math.round(x), y: Math.round(y) });
-  x = physical.x; y = physical.y;
-  await new Promise((resolve, reject) => execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class IslandHUDMouse {
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-  [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
-}
-'@
-[IslandHUDMouse]::SetCursorPos(${Math.round(x)}, ${Math.round(y)}) | Out-Null
-Start-Sleep -Milliseconds 120
-[IslandHUDMouse]::SetCursorPos(${Math.round(x - 18)}, ${Math.round(y)}) | Out-Null
-Start-Sleep -Milliseconds 80
-[IslandHUDMouse]::SetCursorPos(${Math.round(x)}, ${Math.round(y)}) | Out-Null
-Start-Sleep -Milliseconds 120
-[IslandHUDMouse]::mouse_event(0x0002, 0, 0, 0, [UIntPtr]::Zero)
-Start-Sleep -Milliseconds 60
-[IslandHUDMouse]::mouse_event(0x0004, 0, 0, 0, [UIntPtr]::Zero)
-`], { windowsHide: true, timeout: 5000 }, error => error ? reject(error) : resolve()));
-}
+// Real pointer input: renderer coordinates are DIP, Windows input uses physical
+// pixels, including when Chromium is exercising a forced DPI scale.
+const clickAt = (x, y) => windowsInput.clickAt(x, y);
 
 function sendKeys(keys) {
   for (const keyCode of keys) win.webContents.sendInputEvent({ type: 'char', keyCode });
 }
 
-function cursorPosition() {
-  const value = execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
-    'Add-Type -AssemblyName System.Windows.Forms; $p=[System.Windows.Forms.Cursor]::Position; "$($p.X),$($p.Y)"'],
-  { encoding: 'utf8', windowsHide: true, timeout: 5000 }).trim();
-  const [x, y] = value.split(',').map(Number);
-  return { x, y };
-}
+const cursorPosition = () => windowsInput.cursorPosition();
 
 app.on('browser-window-created', (_event, created) => { win = created; });
 require('../src/probe/main.cjs');
 
 app.whenReady().then(async () => {
+  if (!windowsInput.injectionAvailable()) {
+    fs.writeFileSync(resultFile, JSON.stringify({ status: 'skipped',
+      reason: 'pointer input from processes spawned by this agent is filtered; the desktop itself accepts input, so run the pointer runners from your own terminal' }, null, 2));
+    app.quit(); return;
+  }
   const previousCursor = cursorPosition();
   let controller, pending;
   try {
@@ -103,7 +80,7 @@ app.whenReady().then(async () => {
         pause(2500).then(() => ({ status: `timeout-after-windows-click-${decision}` })),
       ]);
       if (reply.decision !== decision) {
-        fs.writeFileSync(path.join(root, 'failed-click.png'), (await win.webContents.capturePage()).toPNG());
+        await saveScreenshot(win, path.join(root, 'failed-click.png'));
         console.log('pointer-failure', JSON.stringify(await win.webContents.executeJavaScript('({scene:window.__islandApp.getState().scene,notch:document.querySelector("#notch").getBoundingClientRect().toJSON(), button:document.querySelector("[data-native-action=allow]")?.getBoundingClientRect().toJSON()})')));
         throw new Error(`Real Windows click did not submit ${decision}: ` + JSON.stringify(reply));
       }
@@ -198,18 +175,7 @@ app.whenReady().then(async () => {
     fs.writeFileSync(resultFile, JSON.stringify({ status: 'failed', error: error.stack }, null, 2));
     process.exitCode = 1;
   } finally {
-    try {
-      execFileSync('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `
-Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-public static class IslandHUDCursor {
-  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
-}
-'@
-[IslandHUDCursor]::SetCursorPos(${Math.round(previousCursor.x)}, ${Math.round(previousCursor.y)}) | Out-Null
-`], { windowsHide: true, timeout: 5000 });
-    } catch { /* cursor restoration is best effort */ }
+    try { windowsInput.setCursorPosition(previousCursor.x, previousCursor.y); } catch { /* cursor restoration is best effort */ }
     await pause(150);
     app.quit();
   }

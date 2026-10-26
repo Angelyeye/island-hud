@@ -111,3 +111,53 @@ test('DSH connection status requires a recent event and reports plugin version c
   assert.equal(manager.status().connected, true); assert.match(manager.status().reason, /重启 DSH/);
   now += 45001; assert.equal(manager.status().connected, false);
 });
+test('a junction that lstat reports as a plain directory still resolves to the managed package', t => {
+  const { manager } = setup(t);
+  assert.equal(manager.install().installed, true);
+  const target = manager.readLink();
+  assert.ok(target);
+  // Sandboxed or filtered Windows filesystems can hide the reparse point from
+  // lstat while the native resolver still follows it.
+  const realLstat = fs.lstatSync;
+  fs.lstatSync = (file, ...args) => {
+    const stat = realLstat(file, ...args);
+    if (file !== manager.link || !stat.isSymbolicLink()) return stat;
+    return { isSymbolicLink: () => false, isDirectory: () => true };
+  };
+  try {
+    assert.equal(manager.readLink(), target);
+    assert.equal(manager.status().installed, true);
+  } finally {
+    fs.lstatSync = realLstat;
+  }
+});
+test('a real directory where the managed link belongs is still rejected', t => {
+  const { manager } = setup(t);
+  manager.install();
+  fs.rmSync(manager.link, { recursive: true, force: true });
+  fs.mkdirSync(manager.link, { recursive: true });
+  assert.throws(() => manager.readLink(), /not a managed local link/);
+});
+test('remove still cleans up when Windows refuses to unlink the junction as a file', t => {
+  const { manager, read } = setup(t);
+  assert.equal(manager.install().installed, true);
+  const target = manager.state().target;
+  const realUnlink = fs.unlinkSync;
+  fs.unlinkSync = file => {
+    if (String(file).includes('@island-hud')) {
+      const error = new Error('EPERM: operation not permitted, unlink \'' + file + '\'');
+      error.code = 'EPERM';
+      throw error;
+    }
+    return realUnlink(file);
+  };
+  try {
+    assert.equal(manager.remove().installed, false);
+  } finally {
+    fs.unlinkSync = realUnlink;
+  }
+  assert.equal(read().dependencies?.[NAME], undefined);
+  assert.equal(fs.existsSync(manager.link), false);
+  // The version directory that the link pointed at must survive the unlink.
+  assert.equal(fs.existsSync(target), true);
+});

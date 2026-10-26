@@ -26,3 +26,4 @@ docs/
 src/tools/*.exe
 src/tools/pipe-host-build.json
 src/tools/foreground-watcher-build.json
+src/tools/input-helper-build.json

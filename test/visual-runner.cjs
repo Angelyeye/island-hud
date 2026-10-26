@@ -3,6 +3,7 @@ const { app, BrowserWindow } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
+const { saveScreenshot } = require('./helpers.cjs');
 const root = process.env.ISLAND_HUD_TEST_ROOT;
 if (!root || !path.isAbsolute(root)) throw new Error('Absolute test root required');
 fs.mkdirSync(root, { recursive: true }); app.setPath('userData', path.join(root, 'electron'));
@@ -24,7 +25,7 @@ app.whenReady().then(async () => {
         assert.equal(Math.round(geometry.width), scene === 'compact' ? density === 'comfortable' ? 320 : 280 : density === 'comfortable' ? 520 : 440);
         assert.ok(geometry.height <= 560 && geometry.height >= 34, JSON.stringify(geometry)); assert.equal(geometry.blur, 'none'); assert.equal(geometry.background, 'rgb(0, 0, 0)');
         frames.push({ density, scene, ...geometry });
-        fs.writeFileSync(path.join(root, density + '-' + scene + '.png'), (await win.webContents.capturePage()).toPNG());
+        await saveScreenshot(win, path.join(root, density + '-' + scene + '.png'));
       }
       checks.push(density + ': six scenes share logical-pixel widths, bounded height, pure black and sharp text');
     }

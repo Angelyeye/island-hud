@@ -5,6 +5,8 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
+// Restricted hosts pass extra Chromium switches through ISLAND_HUD_ELECTRON_FLAGS.
+const electronFlags = require('./electron-flags.cjs').parseFlags();
 const declared = require(path.join(root, 'package.json')).devDependencies.electron;
 const bundled = path.join(root, 'node_modules/electron/dist/electron.exe');
 const sibling = path.resolve(root, `../electron-${declared}/electron.exe`);
@@ -22,7 +24,7 @@ const env = {
   ISLAND_DIAG_FILE: path.join(testRoot, 'application.log'),
 };
 delete env.ELECTRON_RUN_AS_NODE;
-const child = spawn(electron, packaged ? [] : [path.join(root, 'src/main.js')], {
+const child = spawn(electron, [...electronFlags, ...(packaged ? [] : [path.join(root, 'src/main.js')])], {
   cwd: root,
   env,
   windowsHide: true,

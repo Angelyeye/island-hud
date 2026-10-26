@@ -311,6 +311,7 @@ let fullscreenWatcher = null;
 let autoHidden = false;
 let quitting = false;
 let settingsWin = null;
+let settingsOpen = false;
 let hitTestTimer = null;
 let lastPointerInside = false;
 let idleHidden = false;
@@ -407,6 +408,16 @@ function makeTrayIcon() {
   return loadAppIcon(32);
 }
 
+// The overlay is a 568×624 transparent topmost window, but only its top 34px
+// is visible. A normal settings window dragged under that transparent area is
+// composited beneath a repainting topmost surface and flickers, so the island
+// yields the topmost slot while settings is open.
+function setIslandAlwaysOnTop(enabled) {
+  if (!win || win.isDestroyed()) return;
+  if (enabled) win.setAlwaysOnTop(true, 'screen-saver');
+  else win.setAlwaysOnTop(false);
+}
+
 function createWindow() {
   const display = targetDisplay();
   const layout = presentation.geometry(settings, { workArea: display.workArea });
@@ -443,7 +454,7 @@ function createWindow() {
     },
   });
 
-  win.setAlwaysOnTop(true, 'screen-saver');
+  setIslandAlwaysOnTop(true);
   try { win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch { /* Windows no-op */ }
   win.setIgnoreMouseEvents(true, { forward: true });
   win.setMenuBarVisibility(false);
@@ -499,17 +510,23 @@ function onDisplaysChanged() {
 }
 
 function reposition() {
-  if (!win) return;
+  if (!win || win.isDestroyed()) return;
   const display = targetDisplay();
   const { x, y, width } = display.workArea;
   const layout = presentation.geometry(settings, { workArea: display.workArea });
   WIN_W = layout.windowWidth; WIN_H = layout.windowHeight;
-  win.setBounds({
-    x: Math.round(x + (width - WIN_W) / 2),
-    y: Math.round(y),
-    width: WIN_W,
-    height: WIN_H,
-  });
+  // A bounds change while the island is not topmost makes Windows refuse to
+  // restore its topmost style afterwards. Settings saves can resize the live
+  // island, so defer that resize until the settings window closes and the
+  // topmost slot is restored (see openSettingsWindow).
+  if (!settingsOpen) {
+    win.setBounds({
+      x: Math.round(x + (width - WIN_W) / 2),
+      y: Math.round(y),
+      width: WIN_W,
+      height: WIN_H,
+    });
+  }
   publishEnvironment();
 }
 
@@ -825,12 +842,13 @@ function settingsPayload() {
 }
 
 function openSettingsWindow() {
-  if (settingsWin && !settingsWin.isDestroyed()) {
+  if (settingsWin && !settingsWin.isDestroyed() && settingsOpen) {
+    setIslandAlwaysOnTop(false);
     settingsWin.show();
     settingsWin.focus();
     return settingsWin;
   }
-  settingsWin = new BrowserWindow({
+  const windowRef = new BrowserWindow({
     width: Math.min(760, screen.getPrimaryDisplay().workArea.width - 32),
     height: Math.min(680, screen.getPrimaryDisplay().workArea.height - 40),
     minWidth: 360,
@@ -849,18 +867,37 @@ function openSettingsWindow() {
       nodeIntegration: false,
     },
   });
-  settingsWin.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWin = windowRef;
+  settingsOpen = true;
+  setIslandAlwaysOnTop(false);
+  windowRef.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   // Same lock-down as the island window (see createWindow): a local page that
   // must never open windows or navigate away from its bundled origin.
-  settingsWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
-  settingsWin.webContents.on('will-navigate', event => event.preventDefault());
-  settingsWin.once('ready-to-show', () => {
-    if (!settingsWin || settingsWin.isDestroyed()) return;
-    settingsWin.show();
-    settingsWin.focus();
+  windowRef.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  windowRef.webContents.on('will-navigate', event => event.preventDefault());
+  windowRef.once('ready-to-show', () => {
+    if (settingsWin !== windowRef || windowRef.isDestroyed()) return;
+    windowRef.show();
+    windowRef.focus();
   });
-  settingsWin.on('closed', () => { settingsWin = null; });
-  return settingsWin;
+  // Windows can refuse to restore a topmost style after the settings window is
+  // destroyed, so restore it while this window is still closing. The deferred
+  // island resize then runs after the window is gone.
+  windowRef.on('close', () => {
+    if (settingsWin !== windowRef) return;
+    settingsOpen = false;
+    setIslandAlwaysOnTop(true);
+  });
+  windowRef.on('closed', () => {
+    if (settingsWin !== windowRef) return;
+    settingsWin = null;
+    if (settingsOpen) {
+      settingsOpen = false;
+      setIslandAlwaysOnTop(true);
+    }
+    reposition();
+  });
+  return windowRef;
 }
 
 // ZCode exposes no per-session route into its client, but the desktop app holds

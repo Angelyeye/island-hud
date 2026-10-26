@@ -51,25 +51,36 @@ app.whenReady().then(async () => {
     await until(() => { settingsWindow = BrowserWindow.getAllWindows().find(win => win !== overlay); return settingsWindow && !settingsWindow.webContents.isLoading(); });
     const settingsJS = source => settingsWindow.webContents.executeJavaScript(source);
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
+    assert.equal(overlay.isAlwaysOnTop(), false);
     await settingsJS('document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="dark";document.querySelector("#settingsTheme").dispatchEvent(new Event("input",{bubbles:true}))');
     assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
     assert.equal(await settingsJS('document.body.classList.contains("light")'), false);
     await pause(300);
     fs.writeFileSync(path.join(root, 'settings-dark-preview.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-dark-preview.png');
-    settingsWindow.close(); await pause(150);
+    settingsWindow.close();
+    await until(() => overlay.isAlwaysOnTop());
+    await until(() => settingsWindow.isDestroyed());
     assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
     checks.push('unsaved settings preview uses the real renderer and cancellation leaves the live density unchanged');
+    checks.push('opening settings yields the island topmost slot and closing restores it');
     await js('window.island.settings.open()'); await until(() => { settingsWindow = BrowserWindow.getAllWindows().find(win => win !== overlay); return settingsWindow && !settingsWindow.webContents.isLoading(); });
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
+    assert.equal(overlay.isAlwaysOnTop(), false);
+    const liveWidthBeforeSave = overlay.getBounds().width;
     await settingsJS('document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="light";document.querySelector("#save").click()');
     await until(() => js('window.__islandApp.getState().layout.width===440'));
     assert.equal((await js('window.island.settings.get()')).settingsVersion, 3);
-    checks.push('saved appearance broadcasts immediately, resizes the overlay and persists version-3 settings');
+    assert.equal(overlay.getBounds().width, liveWidthBeforeSave);
+    checks.push('saved appearance broadcasts immediately and persists version-3 settings without resizing the live island while settings is open');
     fs.writeFileSync(path.join(root, 'settings-light.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-light.png');
     const before = clipboard.readText();
     await settingsJS('document.querySelector("#copyDiag").click()'); await until(() => clipboard.readText() !== before);
     assert.match(clipboard.readText(), /Island HUD/);
     checks.push('the reorganized settings retain working diagnostics actions');
+    settingsWindow.close();
+    await until(() => overlay.isAlwaysOnTop());
+    await until(() => overlay.getBounds().width === 488);
+    checks.push('closing settings restores the island topmost style before applying the deferred resize');
     fs.writeFileSync(path.join(root, 'upgrade-result.json'), JSON.stringify({ status: 'passed', checks, screenshots, note: 'Own GUI and protocol fixtures; native DSH verification is separate.' }, null, 2));
   } catch (error) { controller?.abort(); fs.writeFileSync(path.join(root, 'upgrade-result.json'), JSON.stringify({ status: 'failed', checks, error: error.stack }, null, 2)); process.exitCode = 1; }
   finally { app.quit(); }

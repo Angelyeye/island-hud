@@ -1,7 +1,15 @@
 'use strict';
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { assertPublicHttpsUrl, fetchManifest } = require('../src/update/updater');
+const { assertPublicHttpsUrl, fetchManifest, normalizeChanges } = require('../src/update/updater');
+
+test('release notes normalize into bounded changelog groups', () => {
+  assert.deepEqual(normalizeChanges({ highlights: ['  faster startup '], features: ['Codex Desktop'] }), {
+    highlights: ['faster startup'], features: ['Codex Desktop'],
+  });
+  assert.deepEqual(normalizeChanges({}, 'legacy notes'), { highlights: ['legacy notes'] });
+  assert.deepEqual(normalizeChanges({ fixes: ['x'.repeat(700)] }).fixes, ['x'.repeat(500)]);
+});
 
 test('the update source must be a public https origin', () => {
   assertPublicHttpsUrl('https://example.com/latest.json');

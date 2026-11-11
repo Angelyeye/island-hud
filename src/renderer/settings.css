@@ -6,3 +6,4 @@
 .archive-copy strong{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .archive-copy small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
 .archive-entry .btn{flex:0 0 auto;padding:5px 10px}
+.update-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.update-heading h2{margin:0}.update-changes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}.update-group{min-width:0;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--control)}.update-group strong{display:block;color:var(--text);font-size:11px;margin-bottom:5px}.update-group ul{padding-left:17px;margin:0;color:var(--muted);font-size:11px;line-height:1.6}.update-group li+li{margin-top:3px}@media(max-width:640px){.update-changes{grid-template-columns:1fr}}

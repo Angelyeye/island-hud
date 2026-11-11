@@ -51,6 +51,9 @@ app.whenReady().then(async () => {
     await until(() => { settingsWindow = BrowserWindow.getAllWindows().find(win => win !== overlay); return settingsWindow && !settingsWindow.webContents.isLoading(); });
     const settingsJS = source => settingsWindow.webContents.executeJavaScript(source);
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
+    await settingsJS('document.querySelector("#updateCheck").click()');
+    await until(() => settingsJS('document.querySelector("#updateStatus").textContent === "未配置"'));
+    checks.push('settings exposes a changelog-style update card and handles an unconfigured source');
     assert.equal(overlay.isAlwaysOnTop(), false);
     const primaryId = screen.getPrimaryDisplay().id;
     const displayOptions = await settingsJS('[...document.querySelectorAll("#displayId option")].map(option => ({ value: option.value, text: option.textContent }))');

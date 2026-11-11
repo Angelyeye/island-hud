@@ -69,6 +69,34 @@
     $('codexReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
   }
+  const changeLabels = { highlights: '亮点', features: '新功能', improvements: '改进', fixes: '修复' };
+  function renderUpdateInfo(result) {
+    const statusEl = $('updateStatus'), summaryEl = $('updateSummary'), list = $('updateChanges');
+    if (!statusEl || !summaryEl || !list) return;
+    const status = result?.status || 'error';
+    statusEl.textContent = status === 'available' ? '有新版本' : status === 'up-to-date' ? '已是最新' : status === 'unconfigured' ? '未配置' : '检查失败';
+    statusEl.className = 'badge' + (status === 'available' || status === 'up-to-date' ? ' ok' : '');
+    $('updateOpen').disabled = !result?.info;
+    if (status === 'available') summaryEl.textContent = `发现 ${result.info.latestVersion}（当前 ${result.info.currentVersion}）`;
+    else if (status === 'up-to-date') summaryEl.textContent = `当前 ${result.info.latestVersion}，已经是最新版本。`;
+    else if (status === 'unconfigured') summaryEl.textContent = '请在高级设置中配置公开 HTTPS 更新源。';
+    else summaryEl.textContent = result?.error || '更新检查失败，请稍后重试。';
+    list.textContent = '';
+    for (const [key, label] of Object.entries(changeLabels)) {
+      const entries = result?.info?.changes?.[key]; if (!Array.isArray(entries) || !entries.length) continue;
+      const group = document.createElement('section'); group.className = 'update-group';
+      const title = document.createElement('strong'); title.textContent = label; group.append(title);
+      const ul = document.createElement('ul'); for (const entry of entries) { const li = document.createElement('li'); li.textContent = entry; ul.append(li); }
+      group.append(ul); list.append(group);
+    }
+  }
+  async function checkUpdates() {
+    const button = $('updateCheck'); if (!button || !api?.checkUpdates) return;
+    button.disabled = true; button.textContent = '检查中…';
+    try { renderUpdateInfo(await api.checkUpdates()); status('更新信息已刷新'); }
+    catch (error) { renderUpdateInfo({ status: 'error', error: error.message }); status('更新检查失败', true); }
+    finally { button.disabled = false; button.textContent = '检查更新'; }
+  }
   const hiddenTargets = {
     archive: { list: 'archiveList', count: 'archiveCount', restoreAll: 'archiveRestoreAll', empty: '没有归档的会话', label: '归档' },
     delete: { list: 'deletedList', count: 'deletedCount', restoreAll: 'deletedRestoreAll', empty: '没有删除的会话', label: '删除' },
@@ -165,6 +193,8 @@
   $('zcodeInstall').addEventListener('click', () => manageZcode('install')); $('zcodeRemove').addEventListener('click', () => manageZcode('remove'));
   $('codexInstall').addEventListener('click', () => manageCodex('install')); $('codexRemove').addEventListener('click', () => manageCodex('remove'));
   $('openLogs').addEventListener('click', () => api.openLogs());
+  $('updateCheck').addEventListener('click', checkUpdates);
+  $('updateOpen').addEventListener('click', () => api.openUpdates?.());
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
     $(hiddenTargets[mode].restoreAll).addEventListener('click', () => restoreAllHidden(mode));

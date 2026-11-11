@@ -1078,6 +1078,13 @@ ipcMain.handle('island:external', (event, value) => {
   shell.openExternal(url); return true;
 });
 ipcMain.handle('island:settings:open', event => { if (trustedOverlay(event)) openSettingsWindow(); });
+ipcMain.handle('island:updates:check', event => trustedSettings(event)
+  ? checkForUpdates({ interactive: false })
+  : { status: 'unauthorized' });
+ipcMain.handle('island:updates:open', event => {
+  if (!trustedSettings(event)) return false;
+  shell.openExternal(updater.RELEASES_URL); return true;
+});
 ipcMain.handle('island:dsh:status', event => trustedSettings(event) ? dshIntegration.status() : null);
 ipcMain.handle('island:dsh:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('DSH 集成管理只能从设置窗口操作');

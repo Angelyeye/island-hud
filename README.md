@@ -65,7 +65,7 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 | **DeepSeek Harness** | 本机原生插件 | 会话状态 · 权限审批 · 多题问答<br><sub>支持 timed 非阻塞</sub> | 精确定位到对应会话 |
 | **ZCode** | 写入 hook 配置 | 会话状态 · 权限审批 · 多题问答<br><sub>答案经审批面回传，实验性</sub> | 打开会话所在项目目录 |
 
-| **Codex CLI** | 写入 hook 配置 | 会话状态 · 权限审批<br><sub>审批仅交互（TUI）会话；需 /hooks 信任一次</sub> | 优先打开 `codex://threads/<sessionId>` |
+| **Codex** | hook + app-server | 会话状态 · 权限审批 · Desktop thread/turn 实时状态<br><sub>hook 需 /hooks 信任；Desktop 需开启实时桥接</sub> | 优先打开 `codex://threads/<sessionId>` |
 | ~~ChatGPT 桌面版~~ | 无官方接口 | ——<br><sub>无本地集成面，暂不支持</sub> | —— |
 
 各客户端共用同一套回环通道与同一块岛，列表按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
@@ -141,7 +141,7 @@ npm start
 1. 确认 Codex 卡片可点击，选择「安装 / 修复」。
 2. 安装把本集成添加的 hook 写入 Codex 配置（`~/.codex/hooks.json`，遵循 `CODEX_HOME`）：写入前自动备份，只改动本集成添加的条目，其他工具写入的内容保持不变。
 3. **在 Codex 内运行一次 `/hooks` 信任本集成**，否则 hook 不会执行。
-4. 重新发起一个交互（TUI）会话即生效：会话状态、权限审批会出现在岛上。
+4. 在设置里开启「Codex Desktop 实时桥接」，然后重新发起 Codex 会话；CLI hook 与 Desktop thread/turn 状态都会进入岛上。
 5. 卸载时点击「卸载集成」，只移除本集成添加的 hook 条目。
 
 <details>
@@ -150,7 +150,7 @@ npm start
 <br />
 
 - hook 脚本由 `node` 执行，请确保 Node.js 在 PATH 中；Windows 上经 cmd 执行，带空格路径已做引号处理。
-- **审批卡片仅在交互（TUI）会话出现**：`codex exec` 强制 `approval_policy=never`（沙箱在 OS 层直接放行或拒绝），不会产生审批事件；Codex Desktop / VS Code 扩展派发 hook 属上游已知缺陷。会话状态与完成提醒不受此限制。
+- `codex exec` 仍强制 `approval_policy=never`，不会产生 hook 审批事件；交互 TUI 的审批走 hook，Codex Desktop 的 thread/turn/item 状态和可用的命令审批走 app-server 实时桥接。桥接不可用时会自动回退 hook 模式。
 - 审批卡片打开期间，Codex 的原生命令会等待岛上决策；退出 Island HUD 或长时间不响应时自动回退原生审批。审批卡片最长可等待 6 小时。
 - 只读工具与 `bypassPermissions` 模式不会中转，行为与原生一致。Codex 无 AskUserQuestion 对应物，不支持问答卡片。
 - 若还安装了其他会在 `PermissionRequest` 上阻塞的 hook，两者会同时等待响应；设置页会提示冲突，按需停用其一。
@@ -174,7 +174,7 @@ ChatGPT 桌面应用（Windows）没有任何官方本地集成接口（无 hook
 ## 工作原理与隐私
 
 ```text
-DSH 插件（原生插件） / ZCode / Codex（hook 配置）
+DSH 插件（原生插件） / ZCode hook / Codex hook + app-server
         │  只监听 127.0.0.1，每次启动生成一次性令牌
         ▼
 Island HUD  ──▶  顶部悬浮岛 · 设置页 · 托盘 · 全局热键

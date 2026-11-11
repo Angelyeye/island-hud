@@ -65,7 +65,7 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 | **DeepSeek Harness** | Local native plugin | Session status · permission approval · multi-question prompts<br><sub>supports timed non-blocking mode</sub> | Jumps to the exact session |
 | **ZCode** | Writes hook configuration | Session status · permission approval · multi-question prompts<br><sub>answers are returned through the approval surface, experimental</sub> | Opens the project directory of the session |
 
-| **Codex CLI** | Writes hook configuration | Session status · permission approval<br><sub>approvals in interactive (TUI) sessions only; trust once via /hooks</sub> | Prefers `codex://threads/<sessionId>` |
+| **Codex** | Hooks + app-server | Session status · approvals · live Desktop thread/turn state<br><sub>trust hooks once via /hooks; enable the Desktop bridge</sub> | Prefers `codex://threads/<sessionId>` |
 | ~~ChatGPT desktop~~ | No official interface | ——<br><sub>no local integration surface, not supported</sub> | —— |
 
 All clients share the same loopback channel and the same island. The list sorts pending work first, with the most recently active on top; when one client has many sessions, up to 50 are shown at a time.
@@ -141,7 +141,7 @@ The plugin writes to the DSH configuration in a managed way. Uninstalling is a s
 1. Make sure the Codex card is clickable and choose **Install / Repair** (安装 / 修复).
 2. Installation writes the hooks added by this integration into the Codex configuration (`~/.codex/hooks.json`, honoring `CODEX_HOME`): it backs up first and only touches the entries this integration owns; data written by other tools stays untouched.
 3. **Run `/hooks` once inside Codex to trust this integration**, otherwise the hooks will not execute.
-4. Start a new interactive (TUI) session for it to take effect: session status and permission approvals then appear on the island.
+4. Enable **Codex Desktop live bridge** in Settings, then start a new Codex session; CLI hooks and Desktop thread/turn state will appear on the island.
 5. To remove it, click **Uninstall integration** (卸载集成); only the hook entries added by this integration are removed.
 
 <details>
@@ -150,7 +150,7 @@ The plugin writes to the DSH configuration in a managed way. Uninstalling is a s
 <br />
 
 - Hook scripts are executed by `node`, so make sure Node.js is on your PATH; on Windows the command runs through cmd and paths with spaces are quoted.
-- **Approval cards only appear in interactive (TUI) sessions**: `codex exec` forces `approval_policy=never` (the sandbox allows or denies at the OS level) and never produces approval events; Codex Desktop / VS Code extension hook dispatch is a known upstream defect. Session status and completion alerts are unaffected.
+- `codex exec` still forces `approval_policy=never` and does not emit hook approval events. Interactive TUI approvals use the hook bridge; Codex Desktop thread/turn/item state and available command approvals use the app-server live bridge. If the bridge is unavailable, the hook path remains available.
 - While an approval card is open, the native Codex command waits for the decision on the island. If Island HUD exits or stops responding for a long time, it falls back to the native approval. Approval cards can wait for up to 6 hours.
 - Read-only tools and `bypassPermissions` mode are not proxied and behave exactly as native. Codex has no AskUserQuestion equivalent, so question cards are not supported.
 - If you also run another hook that blocks on `PermissionRequest`, both will wait for a response. The settings page reports the conflict — disable one of them as needed.
@@ -174,7 +174,7 @@ By default the island waits for your decision for as long as the request lives. 
 ## How it works and privacy
 
 ```text
-DSH plugin (native plugin) / ZCode / Codex (hook configuration)
+DSH plugin (native plugin) / ZCode hooks / Codex hooks + app-server
         │  listens on 127.0.0.1 only, fresh one-time token per launch
         ▼
 Island HUD  ──▶  top island · settings page · tray · global hotkeys

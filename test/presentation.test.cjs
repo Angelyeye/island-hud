@@ -36,6 +36,22 @@ test('display policy separates hover, manual collapse, protected editing and com
   policy.manual('compact'); assert.equal(policy.scene(), 'compact');
   policy.leave(); now += 5001; policy.scene(); assert.equal(policy.completion, null);
 });
+
+test('attention phase prioritizes pending decisions for the notch state', () => {
+  assert.equal(P.attentionPhase([], null), 'idle');
+  assert.equal(P.attentionPhase([{ phase: 'running' }], null), 'running');
+  assert.equal(P.attentionPhase([{ phase: 'running' }, { phase: 'waitingForAnswer' }], null), 'waitingForAnswer');
+  assert.equal(P.attentionPhase([{ phase: 'waitingForAnswer' }, { phase: 'waitingForApproval' }], null), 'waitingForApproval');
+  assert.equal(P.attentionPhase([{ phase: 'running' }], { phase: 'waitingForAnswer' }), 'waitingForAnswer');
+});
+
+test('provider chips expose a stable agent mark for the active providers', () => {
+  for (const [provider, glyph] of [['dsh', 'D'], ['zcode', 'Z'], ['codex', 'C']]) {
+    const chip = P.providerChip(provider);
+    assert.match(chip.attrs.class, new RegExp('provider-' + provider));
+    assert.equal(chip.kids[0].kids[0], glyph);
+  }
+});
 test('layout uses logical pixels and bounds both density modes inside a small work area', () => {
   assert.equal(P.geometry().width, 520); assert.equal(P.geometry({ panelDensity: 'compact' }).width, 440);
   const small = P.geometry({}, { workArea: { width: 360, height: 500 }, reducedMotion: true });

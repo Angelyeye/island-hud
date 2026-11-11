@@ -21,6 +21,21 @@ class IntegrationHub extends BridgeServer {
   }
   snapshot() { return [...this.pending.values()].map(r => ({ ...r.request })); }
   change() { this.onChange(this.snapshot()); }
+  addExternalRequest({ provider, requestId, sessionId = null, kind = 'approval', blocking = true, payload = {}, timeoutMs } = {}, respond) {
+    let request;
+    try {
+      request = validateRequest({ provider, id: requestId, sessionId, kind, blocking, payload });
+    } catch { return null; }
+    if (!this.allowedProviders.has(request.provider) || this.pending.has(request.id) || this.closed.has(request.id)) return null;
+    const duration = Math.max(5_000, Math.min(24 * 3600000, Number(timeoutMs) || request.timeoutMs));
+    const rec = { sock: null, request, externalRespond: typeof respond === 'function' ? respond : null, resolve: null, timer: setTimeout(() => {
+      Promise.resolve(rec.externalRespond?.({ decision: 'return' })).catch(() => {}).finally(() => this.finish(request.id, { status: 'expired' }));
+    }, duration) };
+    this.pending.set(request.id, rec);
+    this.log(`external integration request provider=${request.provider} kind=${request.kind} id=${request.requestId} session=${request.sessionId || 'unassociated'}`);
+    this.change();
+    return { ...request };
+  }
   handleSocket(sock) {
     this.sockets.add(sock);
     let buffer = '', request = null;
@@ -85,6 +100,15 @@ class IntegrationHub extends BridgeServer {
     try { normalized = validateDecision(rec.request, decision, extra); } catch (e) { return { status: 'failed', reason: e.message }; }
     rec.request.state = 'submitting';
     const result = new Promise(resolve => { rec.resolve = resolve; });
+    if (rec.externalRespond) {
+      try {
+        await rec.externalRespond(normalized);
+        this.finish(id, { status: 'delivered' });
+      } catch (error) {
+        this.finish(id, { status: 'failed', reason: error?.message || 'external-response-failed' });
+      }
+      return result;
+    }
     rec.receiptTimer = setTimeout(() => {
       this.finish(id, { status: 'failed', reason: 'adapter-receipt-timeout' }); rec.sock.destroy();
     }, 2000);

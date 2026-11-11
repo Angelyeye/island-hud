@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const presentation = require('../renderer/presentation.js');
-const DEFAULTS = { settingsVersion: 3, displayId: null, updateUrl: '', autoCheckUpdates: false, lastUpdateCheck: 0, autoHideFullscreen: false, dshTimedQuestions: false, ...presentation.DEFAULTS };
+const DEFAULTS = { settingsVersion: 3, displayId: null, updateUrl: '', autoCheckUpdates: false, lastUpdateCheck: 0, autoHideFullscreen: false, dshTimedQuestions: false, codexAppServer: true, ...presentation.DEFAULTS };
 class SettingsStore {
   constructor(file, { log = () => {} } = {}) { this.file = file; this.log = log; this.value = { ...DEFAULTS }; }
   load() {

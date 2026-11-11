@@ -17,8 +17,7 @@ app.whenReady().then(async () => {
     const js = code => win.webContents.executeJavaScript(code);
     await until(() => js('!!window.__islandApp'));
     assert.deepEqual(await js('window.island.snapshot()'), []);
-    const settings = await js('window.island.settings.get()');
-    assert.equal(settings.autoCheckUpdates, false);
+    assert.equal(await js('window.island.settings.get()'), null);
     assert.equal(app.getPath('userData'), path.join(root, 'electron'));
     assert.equal(win.isFocused(), false); assert.equal(win.getBounds().width, 568);
     checks.push('full application starts with isolated settings, sessions and unchanged non-activating window geometry');
@@ -34,6 +33,7 @@ app.whenReady().then(async () => {
     await js('window.island.settings.open()');
     await until(() => win !== overlay && !win.webContents.isLoading());
     await until(() => js('document.querySelector("#dshStatus").textContent === "未安装"'));
+    assert.equal((await js('window.island.settings.get()')).autoCheckUpdates, false);
     await js('document.querySelector("[data-tab=integrations]").click();document.querySelector("#dshInstall").click()');
     await until(() => js('document.querySelector("#status").textContent === "DSH 集成配置完成"'));
     assert.equal((await js('window.island.settings.dshStatus()')).installed, true);

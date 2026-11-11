@@ -74,6 +74,7 @@
         { tag: 'small', kids: [s.project || '当前项目', s.currentTool?.name ? ' · ' + s.currentTool.name + ' ' + (s.currentTool.detail || '') : ''] },
       ] },
       { tag: 'div', attrs: { class: 'row-tags' }, kids: [
+        P.providerChip(s.provider),
         s.model ? { tag: 'span', attrs: { class: 'source-chip' }, kids: [s.model] } : '',
         { tag: 'span', attrs: { class: 'state-label phase-' + s.phase }, kids: [P.labels[s.phase] || s.phase] },
         { tag: 'time', attrs: { 'data-time': s.updatedAt || Date.now() }, kids: [relative(s.updatedAt)] },
@@ -275,6 +276,7 @@
     notch.style.setProperty('--motion-duration', duration + 'ms');
     notch.style.setProperty('--motion-curve', options.reason === 'hover' && !layout.reduced ? 'cubic-bezier(.2,.8,.2,1.02)' : 'cubic-bezier(.2,.75,.25,1)');
     notch.className = 's-' + name;
+    notch.dataset.attention = P.attentionPhase(state.sessions, native.summary());
     for (const [key, layer] of Object.entries(layers)) layer.classList.toggle('active', key === name);
     if (changed) { notch.dataset.direction = name === 'compact' ? 'collapse' : 'expand'; console.log('HUD_SCENE ' + name); }
     measure();

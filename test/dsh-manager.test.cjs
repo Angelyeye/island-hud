@@ -51,6 +51,17 @@ test('DSH install twice, repair and remove preserve other bundles, dependencies,
   assert.equal(fs.readFileSync(path.join(profileDir, 'pnpm-lock.yaml'), 'utf8'), 'fixture lockfile unchanged\n');
   assert.equal(manager.remove().changed, false);
 });
+test('DSH install initializes a missing profile manifest on explicit repair', t => {
+  const { manager, profileDir, read } = setup(t);
+  fs.unlinkSync(manager.manifest);
+  const installed = manager.install();
+  assert.equal(installed.installed, true);
+  const profile = read();
+  assert.equal(profile.name, 'island-hud-profile'); assert.equal(profile.private, true);
+  assert.match(profile.dependencies[NAME], /^link:/);
+  assert.deepEqual(profile.dsh, { profile: { bundles: [NAME] } });
+  assert.equal(fs.existsSync(profileDir), true);
+});
 test('DSH integration defaults to legacy questions and opts into timed mode only when requested', t => {
   const { manager } = setup(t);
   manager.install();

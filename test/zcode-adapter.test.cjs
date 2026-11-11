@@ -89,6 +89,19 @@ test('prompt submit records the last user text and a session title', async (t) =
   assert.match(view.title, /^demo: 修复认证流程/);
 });
 
+test('oversized hook input fails open without reaching the island', async (t) => {
+  const fx = await zfixture(t);
+  const result = await runHook(fx.descriptor, {
+    hook_event_name: 'UserPromptSubmit', session_id: 'sess-oversized', cwd: 'C:\\work\\demo',
+    prompt: 'x'.repeat((1 << 20) + 1),
+  });
+  assert.equal(result.code, 0);
+  assert.equal(result.out, '');
+  await new Promise(r => setTimeout(r, 150));
+  assert.equal(fx.events.length, 0);
+  assert.equal(fx.changes.at(-1)?.length || 0, 0);
+});
+
 test('stop completes the session', async (t) => {
   const fx = await zfixture(t);
   const store = new SessionStore();

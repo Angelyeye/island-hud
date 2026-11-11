@@ -54,6 +54,12 @@ class DshIntegrationManager {
     }
     return { bytes, value };
   }
+  ensureProfile() {
+    try { fs.accessSync(this.manifest, fs.constants.R_OK | fs.constants.W_OK); return false; }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    atomic(this.manifest, encoded({ name: 'island-hud-profile', private: true }));
+    return true;
+  }
   readLink() {
     let stat;
     try { stat = fs.lstatSync(this.link); } catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -211,6 +217,7 @@ class DshIntegrationManager {
   }
   install() {
     return this.withLock(() => {
+      this.ensureProfile();
       const profile = this.readProfile(), previous = this.state(), oldTarget = this.readLink();
       if (oldTarget) {
         let packageName;

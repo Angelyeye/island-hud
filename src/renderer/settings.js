@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id), P = window.IslandPresentation, api = window.island?.settings, sessionApi = window.island?.sessions;
-  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','approvalHandoffSeconds'];
+  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','codexAppServer','approvalHandoffSeconds'];
   const disposers = [];
   let saved = null, environment = { dark: true }, busy = false, previewReady = false;
   const status = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' error' : ''); };
@@ -31,7 +31,10 @@
     }
     select.value = [...select.options].some(option => option.value === selected) ? selected : 'auto';
   }
-  function theme(value) { document.body.classList.toggle('light', value.settingsTheme === 'light' || value.settingsTheme === 'system' && !environment.dark); }
+  function theme(value) {
+    document.body.classList.toggle('light', value.settingsTheme === 'light' || value.settingsTheme === 'system' && !environment.dark);
+    document.body.classList.toggle('reduced-motion', value.motionMode === 'reduced');
+  }
   function preview() {
     const value = values(); theme(value);
     $('fontValue').textContent = value.contentFontSize + 'px'; $('heightValue').textContent = value.maxPanelHeight + 'px'; $('dwellValue').textContent = Math.round(value.completionDwellMs / 1000) + ' 秒';
@@ -46,7 +49,7 @@
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
     renderDisplays(value, value.displayId == null ? 'auto' : String(value.displayId));
-    updateDsh(value.dsh); updateZcode(value.zcode); updateClaude(value.claude); updateCodex(value.codex); preview();
+    updateDsh(value.dsh); updateZcode(value.zcode); updateCodex(value.codex); preview();
   }
   function updateDsh(value) {
     if (!value) return;
@@ -62,19 +65,40 @@
     $('zcodeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('zcodeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
   }
-  function updateClaude(value) {
-    if (!value) return;
-    $('claudeStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
-    $('claudeStatus').className = 'badge' + (value.connected ? ' ok' : '');
-    $('claudeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
-    $('claudeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
-  }
   function updateCodex(value) {
     if (!value) return;
     $('codexStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
     $('codexStatus').className = 'badge' + (value.connected ? ' ok' : '');
     $('codexReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  const changeLabels = { highlights: '亮点', features: '新功能', improvements: '改进', fixes: '修复' };
+  function renderUpdateInfo(result) {
+    const statusEl = $('updateStatus'), summaryEl = $('updateSummary'), list = $('updateChanges');
+    if (!statusEl || !summaryEl || !list) return;
+    const status = result?.status || 'error';
+    statusEl.textContent = status === 'available' ? '有新版本' : status === 'up-to-date' ? '已是最新' : status === 'unconfigured' ? '未配置' : '检查失败';
+    statusEl.className = 'badge' + (status === 'available' || status === 'up-to-date' ? ' ok' : '');
+    $('updateOpen').disabled = !result?.info;
+    if (status === 'available') summaryEl.textContent = `发现 ${result.info.latestVersion}（当前 ${result.info.currentVersion}）`;
+    else if (status === 'up-to-date') summaryEl.textContent = `当前 ${result.info.latestVersion}，已经是最新版本。`;
+    else if (status === 'unconfigured') summaryEl.textContent = '请在高级设置中配置公开 HTTPS 更新源。';
+    else summaryEl.textContent = result?.error || '更新检查失败，请稍后重试。';
+    list.textContent = '';
+    for (const [key, label] of Object.entries(changeLabels)) {
+      const entries = result?.info?.changes?.[key]; if (!Array.isArray(entries) || !entries.length) continue;
+      const group = document.createElement('section'); group.className = 'update-group';
+      const title = document.createElement('strong'); title.textContent = label; group.append(title);
+      const ul = document.createElement('ul'); for (const entry of entries) { const li = document.createElement('li'); li.textContent = entry; ul.append(li); }
+      group.append(ul); list.append(group);
+    }
+  }
+  async function checkUpdates() {
+    const button = $('updateCheck'); if (!button || !api?.checkUpdates) return;
+    button.disabled = true; button.textContent = '检查中…';
+    try { renderUpdateInfo(await api.checkUpdates()); status('更新信息已刷新'); }
+    catch (error) { renderUpdateInfo({ status: 'error', error: error.message }); status('更新检查失败', true); }
+    finally { button.disabled = false; button.textContent = '检查更新'; }
   }
   const hiddenTargets = {
     archive: { list: 'archiveList', count: 'archiveCount', restoreAll: 'archiveRestoreAll', empty: '没有归档的会话', label: '归档' },
@@ -148,16 +172,6 @@
     } catch (error) { $('zcodeOutput').textContent = error.message; status('ZCode 集成操作失败', true); }
     finally { busy = false; $('zcodeInstall').disabled = $('zcodeRemove').disabled = false; }
   }
-  async function manageClaude(action) {
-    if (busy) return; busy = true; $('claudeInstall').disabled = $('claudeRemove').disabled = true;
-    $('claudeOutput').textContent = action === 'remove' ? '正在卸载集成…' : '正在写入 Claude Code hook 配置…';
-    try {
-      const result = await api.claudeManage(action); updateClaude(result);
-      $('claudeOutput').textContent = result.summary + (result.backupDir ? '\n备份：' + result.backupDir : '');
-      status(action === 'remove' ? 'Claude Code 集成卸载完成' : 'Claude Code 集成配置完成');
-    } catch (error) { $('claudeOutput').textContent = error.message; status('Claude Code 集成操作失败', true); }
-    finally { busy = false; $('claudeInstall').disabled = $('claudeRemove').disabled = false; }
-  }
   async function manageCodex(action) {
     if (busy) return; busy = true; $('codexInstall').disabled = $('codexRemove').disabled = true;
     $('codexOutput').textContent = action === 'remove' ? '正在卸载集成…' : '正在写入 Codex hook 配置…';
@@ -180,9 +194,10 @@
   $('save').addEventListener('click', save); $('close').addEventListener('click', () => window.close());
   $('dshInstall').addEventListener('click', () => manageDsh('install')); $('dshRemove').addEventListener('click', () => manageDsh('remove'));
   $('zcodeInstall').addEventListener('click', () => manageZcode('install')); $('zcodeRemove').addEventListener('click', () => manageZcode('remove'));
-  $('claudeInstall').addEventListener('click', () => manageClaude('install')); $('claudeRemove').addEventListener('click', () => manageClaude('remove'));
   $('codexInstall').addEventListener('click', () => manageCodex('install')); $('codexRemove').addEventListener('click', () => manageCodex('remove'));
   $('openLogs').addEventListener('click', () => api.openLogs());
+  $('updateCheck').addEventListener('click', checkUpdates);
+  $('updateOpen').addEventListener('click', () => api.openUpdates?.());
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
     $(hiddenTargets[mode].restoreAll).addEventListener('click', () => restoreAllHidden(mode));
@@ -208,7 +223,6 @@
     if (busy || document.visibilityState === 'hidden') return;
     api.dshStatus().then(updateDsh).catch(() => {});
     api.zcodeStatus?.().then(updateZcode).catch(() => {});
-    api.claudeStatus?.().then(updateClaude).catch(() => {});
     api.codexStatus?.().then(updateCodex).catch(() => {});
   }, 5000);
   window.addEventListener('pagehide', () => { clearInterval(timer); for (const dispose of disposers) dispose?.(); }, { once: true });

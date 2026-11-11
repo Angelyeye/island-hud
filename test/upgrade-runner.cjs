@@ -51,6 +51,9 @@ app.whenReady().then(async () => {
     await until(() => { settingsWindow = BrowserWindow.getAllWindows().find(win => win !== overlay); return settingsWindow && !settingsWindow.webContents.isLoading(); });
     const settingsJS = source => settingsWindow.webContents.executeJavaScript(source);
     await until(() => settingsJS('document.querySelector("#version").textContent.includes("v")'));
+    await settingsJS('document.querySelector("#updateCheck").click()');
+    await until(() => settingsJS('document.querySelector("#updateStatus").textContent === "未配置"'));
+    checks.push('settings exposes a changelog-style update card and handles an unconfigured source');
     assert.equal(overlay.isAlwaysOnTop(), false);
     const primaryId = screen.getPrimaryDisplay().id;
     const displayOptions = await settingsJS('[...document.querySelectorAll("#displayId option")].map(option => ({ value: option.value, text: option.textContent }))');
@@ -58,14 +61,14 @@ app.whenReady().then(async () => {
     assert.ok(displayOptions.some(option => option.value === String(primaryId) && /主显示器/.test(option.text)));
     assert.equal(await settingsJS('document.querySelector("#displayId").value'), 'auto');
     await settingsJS('document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="dark";document.querySelector("#settingsTheme").dispatchEvent(new Event("input",{bubbles:true}))');
-    assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
+    assert.equal((await settingsJS('window.island.settings.get()')).panelDensity, 'comfortable');
     assert.equal(await settingsJS('document.body.classList.contains("light")'), false);
     await pause(300);
     fs.writeFileSync(path.join(root, 'settings-dark-preview.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-dark-preview.png');
     settingsWindow.close();
     await until(() => overlay.isAlwaysOnTop());
     await until(() => settingsWindow.isDestroyed());
-    assert.equal((await js('window.island.settings.get()')).panelDensity, 'comfortable');
+    assert.equal((await js('window.__islandApp.getState().layout')).width, 520);
     checks.push('unsaved settings preview uses the real renderer and cancellation leaves the live density unchanged');
     checks.push('opening settings yields the island topmost slot and closing restores it');
     await js('window.island.settings.open()'); await until(() => { settingsWindow = BrowserWindow.getAllWindows().find(win => win !== overlay); return settingsWindow && !settingsWindow.webContents.isLoading(); });
@@ -74,7 +77,7 @@ app.whenReady().then(async () => {
     const liveWidthBeforeSave = overlay.getBounds().width;
     await settingsJS(`document.querySelector("#displayId").value="${primaryId}";document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="light";document.querySelector("#save").click()`);
     await until(() => js('window.__islandApp.getState().layout.width===440'));
-    const savedSettings = await js('window.island.settings.get()');
+    const savedSettings = await settingsJS('window.island.settings.get()');
     assert.equal(savedSettings.settingsVersion, 3);
     assert.equal(savedSettings.displayId, primaryId);
     assert.equal(overlay.getBounds().width, liveWidthBeforeSave);

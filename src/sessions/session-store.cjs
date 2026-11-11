@@ -4,7 +4,8 @@ const { keyOf, sessionKey, PROVIDERS } = require('../integrations/contract');
 const rank = phase => ({ waitingForApproval: 0, waitingForAnswer: 1, running: 2, completed: 3, idle: 4 }[phase] ?? 4);
 class SessionStore {
   constructor({ now = Date.now, staleMs = 30 * 60000 } = {}) {
-    this.now = now; this.staleMs = staleMs; this.sessions = new Map(); this.requests = new Map(); this.confirmations = new Map();
+    this.now = now; this.staleMs = staleMs; this.sessions = new Map(); this.requests = new Map();
+    this.requestsBySession = new Map(); this.unassociatedRequests = new Map(); this.confirmations = new Map();
   }
   entry(provider, rawId) {
     if (!PROVIDERS.has(provider) || typeof rawId !== 'string' || !rawId) throw new Error('Verified source and session ID required');
@@ -63,18 +64,26 @@ class SessionStore {
   }
   setRequests(requests) {
     const next = new Map();
+    const bySession = new Map();
+    const unassociated = new Map();
     for (const request of requests) {
       if (!['pending', 'submitting'].includes(request.state)) continue;
       const key = request.requestId || request.id;
       const id = keyOf(request.provider, key);
       const associated = sessionKey(request.provider, request.sessionId);
       if (associated) this.entry(request.provider, request.sessionId);
-      next.set(id, { ...request, sessionKey: associated });
+      const value = { ...request, sessionKey: associated };
+      next.set(id, value);
+      if (associated) {
+        let group = bySession.get(associated);
+        if (!group) bySession.set(associated, group = new Map());
+        group.set(id, value);
+      } else unassociated.set(id, value);
     }
-    this.requests = next;
+    this.requests = next; this.requestsBySession = bySession; this.unassociatedRequests = unassociated;
   }
-  pendingFor(id) { return [...this.requests.values()].filter(request => request.sessionKey === id); }
-  unassociated() { return [...this.requests.values()].filter(request => !request.sessionKey); }
+  pendingFor(id) { return [...(this.requestsBySession.get(id)?.values() || [])]; }
+  unassociated() { return [...this.unassociatedRequests.values()]; }
   snapshot() {
     const result = [];
     for (const entry of this.sessions.values()) {

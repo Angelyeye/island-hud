@@ -31,6 +31,26 @@ function compareVersions(a, b) {
   return 0;
 }
 
+const CHANGE_GROUPS = Object.freeze([
+  ['highlights', '亮点'],
+  ['features', '新功能'],
+  ['improvements', '改进'],
+  ['fixes', '修复'],
+]);
+
+function normalizeChanges(input, notes = '') {
+  const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const changes = {};
+  for (const [key] of CHANGE_GROUPS) {
+    const values = Array.isArray(source[key]) ? source[key] : [];
+    const clean = values.map(value => String(value || '').trim()).filter(Boolean).slice(0, 40)
+      .map(value => value.slice(0, 500));
+    if (clean.length) changes[key] = clean;
+  }
+  if (!Object.keys(changes).length && String(notes || '').trim()) changes.highlights = [String(notes).trim().slice(0, 500)];
+  return changes;
+}
+
 async function fetchJson(url, { timeoutMs = 15000 } = {}) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -91,6 +111,7 @@ async function fetchManifest(manifestUrl, currentVersion) {
     url: String(m.url),
     sha256: m.sha256 ? String(m.sha256).trim().toLowerCase() : '',
     notes: m.notes ? String(m.notes) : '',
+    changes: normalizeChanges(m.changes || m.changelog || m.releaseNotes, m.notes),
   };
 }
 
@@ -99,6 +120,7 @@ const RELEASES_URL = 'https://github.com/Angelyeye/island-hud/releases';
 module.exports = {
   normalizeVersion,
   compareVersions,
+  normalizeChanges,
   assertPublicHttpsUrl,
   fetchManifest,
   RELEASES_URL,

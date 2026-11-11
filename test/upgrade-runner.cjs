@@ -55,6 +55,7 @@ app.whenReady().then(async () => {
     await until(() => settingsJS('document.querySelector("#updateStatus").textContent === "未配置"'));
     checks.push('settings exposes a changelog-style update card and handles an unconfigured source');
     await until(() => settingsJS('!!document.querySelector("#usageSummary .usage-metric")'));
+    await until(() => settingsJS('document.querySelectorAll("#usageProviders .usage-provider").length === 3'));
     await settingsJS('document.querySelector("#usageReset").click()');
     await until(() => settingsJS('document.querySelector("#status").textContent === "使用统计已清除"'));
     checks.push('settings exposes local usage counters and can reset them without storing session content');

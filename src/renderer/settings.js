@@ -83,6 +83,17 @@
       const labelNode = document.createElement('small'); labelNode.textContent = label;
       item.append(valueNode, labelNode); summary.append(item);
     }
+    const providerList = $('usageProviders'); if (!providerList) return;
+    providerList.textContent = '';
+    const logos = { dsh: 'assets/providers/dsh.svg', zcode: 'assets/providers/zcode.png', codex: 'assets/providers/codex.svg' };
+    const labels = { dsh: 'DSH', zcode: 'ZCode', codex: 'Codex' };
+    for (const provider of ['dsh', 'zcode', 'codex']) {
+      const data = value.providers?.[provider] || {}, row = document.createElement('div'); row.className = 'usage-provider';
+      const logo = document.createElement('img'); logo.src = logos[provider]; logo.alt = ''; logo.className = 'usage-provider-logo';
+      const name = document.createElement('strong'); name.textContent = labels[provider];
+      const counts = document.createElement('small'); counts.textContent = `事件 ${number(data.events)} · 审批 ${number(data.approvals)} · 问答 ${number(data.questions)} · 完成 ${number(data.completed)}`;
+      row.append(logo, name, counts); providerList.append(row);
+    }
   }
   const changeLabels = { highlights: '亮点', features: '新功能', improvements: '改进', fixes: '修复' };
   function renderUpdateInfo(result) {

@@ -142,6 +142,13 @@
   const plain = text => String(text || '').replace(/^\s{0,3}(?:#{1,6}\s+|>\s?)/gm, '').replace(/```[^\n]*\n?/g, '').replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1（图片）').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1');
   function summary(text, limit = 1200) { const chars = Array.from(String(text || '')); return { text: chars.slice(0, limit).join(''), truncated: chars.length > limit }; }
   const labels = { running: '运行中', waitingForApproval: '等待审批', waitingForAnswer: '等待回答', completed: '已完成', idle: '空闲' };
+  function attentionPhase(sessions = [], nativeSummary = null) {
+    const phases = ['waitingForApproval', 'waitingForAnswer', 'running', 'completed', 'idle'];
+    const nativePhase = nativeSummary?.phase;
+    if (phases.includes(nativePhase)) return nativePhase;
+    for (const phase of phases) if (sessions.some(session => session?.phase === phase)) return phase;
+    return 'idle';
+  }
   const providers = {
     dsh: { chip: 'DSH', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
     zcode: { chip: 'ZCode', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
@@ -197,5 +204,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, dshRepairPending, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, dshRepairPending, attentionPhase, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
 });

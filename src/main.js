@@ -25,6 +25,7 @@ const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { openCodexThread } = require('./app/codex-client.cjs');
 const { loginItemEnabled } = require('./app/login-item-state.cjs');
+const { trustedOverlay: isTrustedOverlay, trustedSettings: isTrustedSettings } = require('./app/ipc-authorization.cjs');
 const { clientPath: zcodeClientPath, openWorkspace: zcodeOpenWorkspace } = require('./app/zcode-client.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -944,7 +945,8 @@ function existingDirectory(value) {
   try { return fs.statSync(value, { throwIfNoEntry: false })?.isDirectory() ? value : ''; } catch { return ''; }
 }
 
-ipcMain.handle('island:focus', async (_event, id) => {
+ipcMain.handle('island:focus', async (event, id) => {
+  if (!isTrustedOverlay(event, win)) return { status: 'expired', reason: '未授权的窗口来源' };
   const session = visibleSessions().find(s => s.id === id);
   if (!session) return { status: 'expired', reason: '该会话已不在当前列表中' };
   if (session.provider === 'codex') {
@@ -972,7 +974,7 @@ ipcMain.handle('island:focus', async (_event, id) => {
   return opened ? { status: 'unsupported', sessionId: session.rawId, reason: opened }
     : { status: 'navigated', sessionId: session.rawId };
 });
-ipcMain.on('island:interactive', (_e, next) => setInteractive(!!next));
+ipcMain.on('island:interactive', (event, next) => { if (isTrustedOverlay(event, win)) setInteractive(!!next); });
 ipcMain.on('island:bounds', (event, b) => {
   if (!trustedOverlay(event) || !b || !['x','y','w','h','r'].every(key => Number.isFinite(b[key]))) return;
   const bounds = win.getContentBounds();
@@ -980,10 +982,11 @@ ipcMain.on('island:bounds', (event, b) => {
   notchBounds = b;
   setInteractive(isPointInNotch(screen.getCursorScreenPoint(), win.getBounds(), b));
 });
-ipcMain.on('island:quit', () => app.quit());
-ipcMain.on('island:hide', () => setVisible(false));
-ipcMain.handle('island:snapshot', () => visibleSessions());
-const trustedOverlay = event => win && !win.isDestroyed() && event.sender === win.webContents;
+ipcMain.on('island:quit', event => { if (isTrustedOverlay(event, win)) app.quit(); });
+ipcMain.on('island:hide', event => { if (isTrustedOverlay(event, win)) setVisible(false); });
+ipcMain.handle('island:snapshot', event => isTrustedOverlay(event, win) ? visibleSessions() : []);
+const trustedOverlay = event => isTrustedOverlay(event, win);
+const trustedSettings = event => isTrustedSettings(event, settingsWin);
 ipcMain.handle('island:native:snapshot', event => trustedOverlay(event) ? integrationHub?.snapshot() || [] : []);
 ipcMain.handle('island:native:reply', async (event, data) => {
   if (!trustedOverlay(event) || !data || !integrationHub) return { status: 'expired' };
@@ -997,8 +1000,8 @@ ipcMain.handle('island:keyboard', (event, enabled) => {
   setKeyboard(!!enabled);
   return { accepted: true, focused: !!enabled && win?.isFocused() };
 });
-ipcMain.handle('island:settings:get', () => settingsPayload());
-ipcMain.handle('island:environment:get', () => environmentPayload());
+ipcMain.handle('island:settings:get', event => trustedSettings(event) ? settingsPayload() : null);
+ipcMain.handle('island:environment:get', event => trustedOverlay(event) ? environmentPayload() : null);
 ipcMain.on('island:activity', (event, value) => {
   if (!trustedOverlay(event)) return;
   rendererProtected = !!value?.protected; rendererExpanded = !!value?.expanded;
@@ -1010,33 +1013,34 @@ ipcMain.handle('island:completion:get', async (event, value) => {
   if (!session?.file) return { status: 'expired', text: '' };
   return completionReader.read({ file: session.file, sessionKey: view.id, turn: value.turn });
 });
-ipcMain.handle('island:external', (_event, value) => {
+ipcMain.handle('island:external', (event, value) => {
+  if (!trustedOverlay(event)) return false;
   const url = presentation.safeLink(value); if (!url) return false;
   shell.openExternal(url); return true;
 });
 ipcMain.handle('island:settings:open', event => { if (trustedOverlay(event)) openSettingsWindow(); });
-ipcMain.handle('island:dsh:status', () => dshIntegration.status());
+ipcMain.handle('island:dsh:status', event => trustedSettings(event) ? dshIntegration.status() : null);
 ipcMain.handle('island:dsh:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('DSH 集成管理只能从设置窗口操作');
   if (action === 'install' || action === 'repair') return dshIntegration.install();
   if (action === 'remove') return dshIntegration.remove();
   throw new Error('未知的 DSH 集成操作');
 });
-ipcMain.handle('island:zcode:status', () => zcodeIntegration.status());
+ipcMain.handle('island:zcode:status', event => trustedSettings(event) ? zcodeIntegration.status() : null);
 ipcMain.handle('island:zcode:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('ZCode 集成管理只能从设置窗口操作');
   if (action === 'install' || action === 'repair') return zcodeIntegration.install();
   if (action === 'remove') return zcodeIntegration.remove();
   throw new Error('未知的 ZCode 集成操作');
 });
-ipcMain.handle('island:claude:status', () => claudeIntegration.status());
+ipcMain.handle('island:claude:status', event => trustedSettings(event) ? claudeIntegration.status() : null);
 ipcMain.handle('island:claude:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Claude Code 集成管理只能从设置窗口操作');
   if (action === 'install' || action === 'repair') return claudeIntegration.install();
   if (action === 'remove') return claudeIntegration.remove();
   throw new Error('未知的 Claude Code 集成操作');
 });
-ipcMain.handle('island:codex:status', () => codexIntegration.status());
+ipcMain.handle('island:codex:status', event => trustedSettings(event) ? codexIntegration.status() : null);
 ipcMain.handle('island:codex:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Codex 集成管理只能从设置窗口操作');
   if (action === 'install' || action === 'repair') return codexIntegration.install();
@@ -1063,7 +1067,7 @@ ipcMain.handle('island:settings:set', (event, patch = {}) => {
   tray?.setContextMenu(buildTrayMenu());
   return settingsPayload();
 });
-ipcMain.handle('island:diagnostics', () => buildDiagnostics());
+ipcMain.handle('island:diagnostics', event => trustedSettings(event) ? buildDiagnostics() : '');
 // Local visibility management: the overlay may hide one session (archive or
 // delete), and only the settings window may list, restore or clear those lists.
 const archiveCaller = event => trustedOverlay(event) ||
@@ -1101,10 +1105,12 @@ ipcMain.handle('island:session:restore-all', (event, mode) => {
   if (result.ok) { diag(`sessions restored ${mode} ${result.removed}`); notifySessionsChanged(); publishSessionsNow?.(); }
   return result;
 });
-ipcMain.handle('island:clipboard:write', (_e, text) => {
+ipcMain.handle('island:clipboard:write', (event, text) => {
+  if (!trustedSettings(event)) return false;
   try { clipboard.writeText(String(text)); return true; } catch { return false; }
 });
-ipcMain.handle('island:logs:open', () => {
+ipcMain.handle('island:logs:open', event => {
+  if (!trustedSettings(event)) return false;
   try {
     fs.mkdirSync(logDir(), { recursive: true });
     flushLog();

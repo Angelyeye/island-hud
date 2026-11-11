@@ -17,6 +17,8 @@ const PLUGIN_VERSION = require('../package.json').version;
 const READ_ONLY = /^(?:Read|Glob|Grep|TodoWrite|TodoRead|WebFetch|WebSearch|TaskOutput|TaskStop|ListModels|ListSavedWorkflows|ListWorkflowRuns|GetWorkflowRun|ReadSessionContext|SlashCommand)$/i;
 const QUESTION_TOOL = /^(?:AskUserQuestion|ask_user_question)$/i;
 const MAX_INPUT_JSON = 600;
+// Hook events are a few kilobytes; anything beyond 1 MiB is not a real event.
+const MAX_STDIN_CHARS = 1 << 20;
 
 const compact = (text, limit) => String(text || '').replace(/\s+/g, ' ').trim().slice(0, limit);
 const projectOf = cwd => String(cwd || '').split(/[\\/]/).filter(Boolean).pop() || 'ZCode';
@@ -42,7 +44,16 @@ function readStdin() {
     let data = '';
     if (process.stdin.isTTY) return resolve(data);
     process.stdin.setEncoding('utf8');
-    process.stdin.on('data', chunk => { data += chunk; });
+    process.stdin.on('data', chunk => {
+      data += chunk;
+      if (data.length > MAX_STDIN_CHARS) {
+        // Oversized input is not a hook event: drop it and fail open. The
+        // later end/error handlers resolve the already-settled promise as no-ops.
+        data = '';
+        process.stdin.destroy();
+        resolve(data);
+      }
+    });
     process.stdin.on('end', () => resolve(data));
     process.stdin.on('error', () => resolve(data));
     // A wedged host must never hold the agent's tool call longer than this.

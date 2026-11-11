@@ -49,7 +49,7 @@
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
     renderDisplays(value, value.displayId == null ? 'auto' : String(value.displayId));
-    updateDsh(value.dsh); updateZcode(value.zcode); updateCodex(value.codex); preview();
+    updateDsh(value.dsh); updateZcode(value.zcode); updateCodex(value.codex); renderUsage(value.usage); preview();
   }
   function updateDsh(value) {
     if (!value) return;
@@ -71,6 +71,18 @@
     $('codexStatus').className = 'badge' + (value.connected ? ' ok' : '');
     $('codexReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
     $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  function renderUsage(value = {}) {
+    const since = $('usageSince'), summary = $('usageSummary'); if (!since || !summary) return;
+    const totals = value.totals || {}, number = n => new Intl.NumberFormat('zh-CN').format(Number(n) || 0);
+    since.textContent = value.since ? '自 ' + new Date(value.since).toLocaleDateString() : '尚未统计';
+    summary.textContent = '';
+    for (const [label, key] of [['事件', 'events'], ['审批', 'approvals'], ['问答', 'questions'], ['完成', 'completed']]) {
+      const item = document.createElement('div'); item.className = 'usage-metric';
+      const valueNode = document.createElement('strong'); valueNode.textContent = number(totals[key]);
+      const labelNode = document.createElement('small'); labelNode.textContent = label;
+      item.append(valueNode, labelNode); summary.append(item);
+    }
   }
   const changeLabels = { highlights: '亮点', features: '新功能', improvements: '改进', fixes: '修复' };
   function renderUpdateInfo(result) {
@@ -198,6 +210,7 @@
   $('openLogs').addEventListener('click', () => api.openLogs());
   $('updateCheck').addEventListener('click', checkUpdates);
   $('updateOpen').addEventListener('click', () => api.openUpdates?.());
+  $('usageReset').addEventListener('click', async () => { const value = await api.resetUsage?.(); if (value) { renderUsage(value); status('使用统计已清除'); } });
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
     $(hiddenTargets[mode].restoreAll).addEventListener('click', () => restoreAllHidden(mode));

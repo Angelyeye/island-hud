@@ -1103,7 +1103,10 @@ ipcMain.handle('island:updates:open', event => {
   if (!trustedSettings(event)) return false;
   shell.openExternal(updater.RELEASES_URL); return true;
 });
-ipcMain.handle('island:usage:reset', event => trustedSettings(event) ? usageStore.reset() : null);
+ipcMain.handle('island:usage:reset', event => {
+  if (!trustedSettings(event)) return false;
+  usageStore.reset(); return true;
+});
 ipcMain.handle('island:dsh:status', event => trustedSettings(event) ? dshIntegration.status() : null);
 ipcMain.handle('island:dsh:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('DSH 集成管理只能从设置窗口操作');

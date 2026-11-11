@@ -47,7 +47,7 @@ class UsageStore {
     this.save(); return true;
   }
   reset() { this.value = empty(this.now()); this.seenRequests.clear(); this.save(); return this.snapshot(); }
-  snapshot() { return structuredClone(this.value); }
+  snapshot() { return JSON.parse(JSON.stringify(this.value)); }
 }
 
 module.exports = { UsageStore, PROVIDERS, VERSION };

@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id), P = window.IslandPresentation, api = window.island?.settings, sessionApi = window.island?.sessions;
-  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','codexAppServer','approvalHandoffSeconds'];
+  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','notificationSound','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','codexAppServer','approvalHandoffSeconds'];
   const disposers = [];
   let saved = null, environment = { dark: true }, busy = false, previewReady = false;
   const status = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' error' : ''); };
@@ -221,7 +221,7 @@
   $('openLogs').addEventListener('click', () => api.openLogs());
   $('updateCheck').addEventListener('click', checkUpdates);
   $('updateOpen').addEventListener('click', () => api.openUpdates?.());
-  $('usageReset').addEventListener('click', async () => { const value = await api.resetUsage?.(); if (value) { renderUsage(value); status('使用统计已清除'); } });
+  $('usageReset').addEventListener('click', async () => { const cleared = await api.resetUsage?.(); if (cleared) { renderUsage({ since: Date.now(), totals: { events: 0, approvals: 0, questions: 0, completed: 0 }, providers: {} }); status('使用统计已清除'); } });
   $('copyDiag').addEventListener('click', async () => { try { await api.copy(await api.diagnostics()); status('诊断信息已复制'); } catch (e) { status(e.message, true); } });
   for (const mode of Object.keys(hiddenTargets)) {
     $(hiddenTargets[mode].restoreAll).addEventListener('click', () => restoreAllHidden(mode));

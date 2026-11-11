@@ -52,6 +52,12 @@ test('provider chips expose a stable agent mark for the active providers', () =>
     assert.equal(chip.kids[0].kids[0], glyph);
   }
 });
+
+test('notification sound setting is constrained to the supported modes', () => {
+  assert.equal(P.normalize({ notificationSound: 'soft' }).notificationSound, 'soft');
+  assert.equal(P.normalize({ notificationSound: 'full' }).notificationSound, 'full');
+  assert.equal(P.normalize({ notificationSound: 'loud-and-unbounded' }).notificationSound, 'off');
+});
 test('layout uses logical pixels and bounds both density modes inside a small work area', () => {
   assert.equal(P.geometry().width, 520); assert.equal(P.geometry({ panelDensity: 'compact' }).width, 440);
   const small = P.geometry({}, { workArea: { width: 360, height: 500 }, reducedMotion: true });

@@ -21,6 +21,8 @@ const { SessionStore } = require('./sessions/session-store.cjs');
 const { DshIntegrationManager } = require('./app/dsh-integration-manager.cjs');
 const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
+const { CodexAppServer } = require('./app/codex-app-server.cjs');
+const { CodexAppServerBridge } = require('./app/codex-app-server-bridge.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { openCodexThread } = require('./app/codex-client.cjs');
 const { loginItemEnabled } = require('./app/login-item-state.cjs');
@@ -328,6 +330,8 @@ let tray = null;
 let bridge = null;
 let dshNavigation = null;
 let integrationHub = null;
+let codexAppServer = null;
+let codexAppBridge = null;
 let sessionPublishTimer = null;
 let keyboardEnabled = false;
 let interactive = false;
@@ -812,6 +816,73 @@ function pipeHelperPath() {
 const dshIntegration = createDshIntegration({ timedQuestions: settings.dshTimedQuestions === true });
 const zcodeIntegration = createZcodeIntegration();
 const codexIntegration = createCodexIntegration();
+const codexAppRequestIds = new Set();
+
+function startCodexAppServer() {
+  if (TEST_ROOT || codexAppServer || settings.codexAppServer === false) return;
+  const server = new CodexAppServer({ log: message => diag(message) });
+  const bridge = new CodexAppServerBridge({
+    server,
+    onEvent: event => {
+      sessionStore.applyEvent(event);
+      publishSessionsNow?.();
+    },
+    onApproval: approval => {
+      const request = integrationHub?.addExternalRequest({
+        provider: 'codex', requestId: approval.requestId, sessionId: approval.sessionId,
+        kind: approval.kind, blocking: true, payload: approval.payload, timeoutMs: 6 * 3600000,
+      }, async normalized => {
+        const decision = normalized.decision === 'allow' ? 'accept'
+          : normalized.decision === 'deny' ? 'decline' : 'cancel';
+        if (!approval.respond({ decision })) throw new Error('Codex app-server is unavailable');
+        const outcome = normalized.decision === 'allow' ? 'allowed-once'
+          : normalized.decision === 'deny' ? 'rejected' : 'cancelled';
+        sessionStore.applyEvent({ provider: 'codex', sessionId: approval.sessionId, at: Date.now(), payload: {
+          event: 'ApprovalDecided', requestId: approval.requestId, outcome,
+        } });
+        publishSessionsNow?.();
+      });
+      if (!request) {
+        approval.respond({ decision: 'cancel' });
+        return;
+      }
+      codexAppRequestIds.add(request.id);
+      const originalRespond = approval.respond;
+      approval.respond = value => {
+        codexAppRequestIds.delete(request.id);
+        return originalRespond(value);
+      };
+    },
+    log: message => diag(message),
+  });
+  bridge.on('close', () => {
+    for (const id of [...codexAppRequestIds]) void integrationHub?.respond(id, 'return');
+    codexAppRequestIds.clear();
+    diag('codex app-server closed');
+  });
+  bridge.start();
+  codexAppServer = server;
+  codexAppBridge = bridge;
+  try { server.start(); }
+  catch (error) {
+    diag('codex app-server start failed: ' + error.message);
+    bridge.stop(); codexAppBridge = null; codexAppServer = null;
+    return;
+  }
+  server.initialize().then(() => diag('codex app-server initialized')).catch(error => {
+    diag('codex app-server unavailable: ' + error.message);
+    bridge.stop(); server.stop(); codexAppBridge = null; codexAppServer = null;
+  });
+}
+
+function stopCodexAppServer() {
+  for (const id of [...codexAppRequestIds]) void integrationHub?.respond(id, 'return');
+  codexAppRequestIds.clear();
+  codexAppBridge?.stop();
+  codexAppServer?.stop();
+  codexAppBridge = null;
+  codexAppServer = null;
+}
 
 /* ----------------------------------------------------------------- diagnostics */
 function buildDiagnostics() {
@@ -853,6 +924,7 @@ function settingsPayload() {
     autoCheckUpdates: settings.autoCheckUpdates !== false,
     autoHideFullscreen: settings.autoHideFullscreen === true,
     dshTimedQuestions: settings.dshTimedQuestions === true,
+    codexAppServer: settings.codexAppServer !== false,
     dsh: dshIntegration.status(),
     zcode: zcodeIntegration.status(),
     codex: codexIntegration.status(),
@@ -1041,6 +1113,9 @@ ipcMain.handle('island:settings:set', (event, patch = {}) => {
     settings.dshTimedQuestions = patch.dshTimedQuestions;
     dshIntegration.setTimedQuestions(patch.dshTimedQuestions);
   }
+  if (typeof patch.codexAppServer === 'boolean') settings.codexAppServer = patch.codexAppServer;
+  if (settings.codexAppServer === false) stopCodexAppServer();
+  else startCodexAppServer();
   saveSettings();
   if (idleHidden && !settings.autoHideWhenIdle && !manuallyHidden) { idleHidden = false; setVisible(true, 'idle'); }
   reposition(); publishSettings();
@@ -1225,6 +1300,7 @@ app.whenReady().then(() => {
     },
   });
   integrationHub.start();
+  startCodexAppServer();
   // Start DSH tailing only after publishSessions exists: bridge updates route
   // through it so publishedSessions is kept in sync and duplicate IPC stops.
   bridge.start();
@@ -1276,6 +1352,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
   bridge?.stop();
   integrationHub?.stop();
+  stopCodexAppServer();
   dshNavigation?.stop();
   clearInterval(sessionPublishTimer);
   clearInterval(hitTestTimer);

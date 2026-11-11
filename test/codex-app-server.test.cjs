@@ -21,6 +21,14 @@ test('NDJSON decoder handles split UTF-8 messages and rejects oversized lines', 
   assert.throws(() => decoder.push('x'.repeat(65) + '\n'), /too large/);
 });
 
+test('NDJSON decoder preserves UTF-8 characters split across Buffer chunks', () => {
+  const decoder = new NdjsonDecoder();
+  const bytes = Buffer.from('{"text":"中文"}\n');
+  const split = bytes.indexOf(0xe4);
+  assert.deepEqual(decoder.push(bytes.subarray(0, split + 1)), []);
+  assert.deepEqual(decoder.push(bytes.subarray(split + 1)), [{ text: '中文' }]);
+});
+
 test('app-server requests preserve JSON-RPC ids and resolve responses', async () => {
   const child = fakeProcess();
   const server = new CodexAppServer({ spawn: () => child, requestTimeoutMs: 1000 });

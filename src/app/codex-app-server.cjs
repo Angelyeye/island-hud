@@ -2,6 +2,7 @@
 
 const { EventEmitter } = require('node:events');
 const { spawn: spawnProcess } = require('node:child_process');
+const { StringDecoder } = require('node:string_decoder');
 
 const MAX_LINE_BYTES = 1 << 20;
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
@@ -10,10 +11,11 @@ class NdjsonDecoder {
   constructor({ maxLineBytes = MAX_LINE_BYTES } = {}) {
     this.maxLineBytes = maxLineBytes;
     this.buffer = '';
+    this.decoder = new StringDecoder('utf8');
   }
 
   push(chunk) {
-    this.buffer += Buffer.isBuffer(chunk) ? chunk.toString('utf8') : String(chunk || '');
+    this.buffer += Buffer.isBuffer(chunk) ? this.decoder.write(chunk) : String(chunk || '');
     const messages = [];
     let newline;
     while ((newline = this.buffer.indexOf('\n')) >= 0) {
@@ -28,7 +30,7 @@ class NdjsonDecoder {
   }
 
   finish() {
-    const tail = this.buffer.trim();
+    const tail = (this.buffer + this.decoder.end()).trim();
     this.buffer = '';
     if (!tail) return [];
     if (Buffer.byteLength(tail, 'utf8') > this.maxLineBytes) throw new Error('Codex app-server message too large');
@@ -59,6 +61,7 @@ class CodexAppServer extends EventEmitter {
     this.nextId = 1;
     this.pending = new Map();
     this.stopping = false;
+    this.decoder = new NdjsonDecoder();
   }
 
   get running() { return !!this.child && !this.child.killed; }

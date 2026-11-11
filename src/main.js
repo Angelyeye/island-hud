@@ -332,6 +332,8 @@ let dshNavigation = null;
 let integrationHub = null;
 let codexAppServer = null;
 let codexAppBridge = null;
+let codexAppRestartTimer = null;
+let codexAppRestartAttempt = 0;
 let sessionPublishTimer = null;
 let keyboardEnabled = false;
 let interactive = false;
@@ -820,6 +822,7 @@ const codexAppRequestIds = new Set();
 
 function startCodexAppServer() {
   if (TEST_ROOT || codexAppServer || settings.codexAppServer === false) return;
+  clearTimeout(codexAppRestartTimer); codexAppRestartTimer = null;
   const server = new CodexAppServer({ log: message => diag(message) });
   const bridge = new CodexAppServerBridge({
     server,
@@ -860,6 +863,14 @@ function startCodexAppServer() {
     codexAppRequestIds.clear();
     diag('codex app-server closed');
   });
+  server.on('close', info => {
+    if (info.stopping || settings.codexAppServer === false || codexAppServer !== server) return;
+    bridge.stop(); codexAppBridge = null; codexAppServer = null;
+    const delay = Math.min(30000, 1000 * (2 ** Math.min(codexAppRestartAttempt++, 5)));
+    diag(`codex app-server restarting in ${delay}ms`);
+    codexAppRestartTimer = setTimeout(() => { codexAppRestartTimer = null; startCodexAppServer(); }, delay);
+    codexAppRestartTimer.unref?.();
+  });
   bridge.start();
   codexAppServer = server;
   codexAppBridge = bridge;
@@ -869,13 +880,14 @@ function startCodexAppServer() {
     bridge.stop(); codexAppBridge = null; codexAppServer = null;
     return;
   }
-  server.initialize().then(() => diag('codex app-server initialized')).catch(error => {
+  server.initialize().then(() => { codexAppRestartAttempt = 0; diag('codex app-server initialized'); }).catch(error => {
     diag('codex app-server unavailable: ' + error.message);
     bridge.stop(); server.stop(); codexAppBridge = null; codexAppServer = null;
   });
 }
 
 function stopCodexAppServer() {
+  clearTimeout(codexAppRestartTimer); codexAppRestartTimer = null; codexAppRestartAttempt = 0;
   for (const id of [...codexAppRequestIds]) void integrationHub?.respond(id, 'return');
   codexAppRequestIds.clear();
   codexAppBridge?.stop();

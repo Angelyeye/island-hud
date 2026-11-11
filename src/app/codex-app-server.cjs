@@ -61,7 +61,6 @@ class CodexAppServer extends EventEmitter {
     this.nextId = 1;
     this.pending = new Map();
     this.stopping = false;
-    this.decoder = new NdjsonDecoder();
   }
 
   get running() { return !!this.child && !this.child.killed; }
@@ -69,6 +68,7 @@ class CodexAppServer extends EventEmitter {
   start() {
     if (this.child) return false;
     this.stopping = false;
+    this.decoder = new NdjsonDecoder();
     const child = this.spawn(this.command, this.args, {
       cwd: this.cwd,
       env: this.env ? { ...process.env, ...this.env } : process.env,

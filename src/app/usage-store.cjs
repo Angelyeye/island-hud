@@ -39,8 +39,9 @@ class UsageStore {
     this.save(); return true;
   }
   recordRequest(provider, requestId, kind) {
-    if (!this.value.providers[provider] || typeof requestId !== 'string' || this.seenRequests.has(requestId)) return false;
-    this.seenRequests.add(requestId); while (this.seenRequests.size > 2048) this.seenRequests.delete(this.seenRequests.values().next().value);
+    const key = typeof requestId === 'string' ? provider + ':' + requestId : '';
+    if (!this.value.providers[provider] || !key || this.seenRequests.has(key)) return false;
+    this.seenRequests.add(key); while (this.seenRequests.size > 2048) this.seenRequests.delete(this.seenRequests.values().next().value);
     if (kind === 'approval') { this.value.totals.approvals++; this.value.providers[provider].approvals++; }
     if (kind === 'question') { this.value.totals.questions++; this.value.providers[provider].questions++; }
     this.save(); return true;

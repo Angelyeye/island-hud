@@ -31,7 +31,10 @@
     }
     select.value = [...select.options].some(option => option.value === selected) ? selected : 'auto';
   }
-  function theme(value) { document.body.classList.toggle('light', value.settingsTheme === 'light' || value.settingsTheme === 'system' && !environment.dark); }
+  function theme(value) {
+    document.body.classList.toggle('light', value.settingsTheme === 'light' || value.settingsTheme === 'system' && !environment.dark);
+    document.body.classList.toggle('reduced-motion', value.motionMode === 'reduced');
+  }
   function preview() {
     const value = values(); theme(value);
     $('fontValue').textContent = value.contentFontSize + 'px'; $('heightValue').textContent = value.maxPanelHeight + 'px'; $('dwellValue').textContent = Math.round(value.completionDwellMs / 1000) + ' 秒';

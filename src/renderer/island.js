@@ -74,6 +74,7 @@
         { tag: 'small', kids: [s.project || '当前项目', s.currentTool?.name ? ' · ' + s.currentTool.name + ' ' + (s.currentTool.detail || '') : ''] },
       ] },
       { tag: 'div', attrs: { class: 'row-tags' }, kids: [
+        P.providerChip(s.provider),
         s.model ? { tag: 'span', attrs: { class: 'source-chip' }, kids: [s.model] } : '',
         { tag: 'span', attrs: { class: 'state-label phase-' + s.phase }, kids: [P.labels[s.phase] || s.phase] },
         { tag: 'time', attrs: { 'data-time': s.updatedAt || Date.now() }, kids: [relative(s.updatedAt)] },

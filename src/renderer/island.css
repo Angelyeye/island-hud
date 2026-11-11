@@ -50,6 +50,7 @@ fieldset{border:0;min-width:0;padding:0}.ask-q{font-size:var(--body-size);font-w
 .all-list.dense .row-copy small{font-size:10px}
 .all-footer{display:flex;justify-content:space-between;align-items:center;gap:10px;color:#777;font-size:10px;flex:0 0 auto}
 .narrow .session-header .source-chip{display:none}
+.row-tags .provider-chip{min-height:19px;padding:1px 5px 1px 3px;font-size:9px}.row-tags .provider-mark{width:14px;height:14px}.narrow .row-tags .provider-chip>span:last-child{display:none}
 .narrow .row-copy small{display:none}
 .narrow .row-tags time{display:none}
 .narrow .row-arrow{display:none}

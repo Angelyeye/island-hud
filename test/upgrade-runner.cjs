@@ -54,6 +54,10 @@ app.whenReady().then(async () => {
     await settingsJS('document.querySelector("#updateCheck").click()');
     await until(() => settingsJS('document.querySelector("#updateStatus").textContent === "未配置"'));
     checks.push('settings exposes a changelog-style update card and handles an unconfigured source');
+    await until(() => settingsJS('!!document.querySelector("#usageSummary .usage-metric")'));
+    await settingsJS('document.querySelector("#usageReset").click()');
+    await until(() => settingsJS('document.querySelector("#status").textContent === "使用统计已清除"'));
+    checks.push('settings exposes local usage counters and can reset them without storing session content');
     assert.equal(overlay.isAlwaysOnTop(), false);
     const primaryId = screen.getPrimaryDisplay().id;
     const displayOptions = await settingsJS('[...document.querySelectorAll("#displayId option")].map(option => ({ value: option.value, text: option.textContent }))');

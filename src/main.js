@@ -23,6 +23,7 @@ const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { CodexAppServer } = require('./app/codex-app-server.cjs');
 const { CodexAppServerBridge } = require('./app/codex-app-server-bridge.cjs');
+const { UsageStore } = require('./app/usage-store.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { openCodexThread } = require('./app/codex-client.cjs');
 const { loginItemEnabled } = require('./app/login-item-state.cjs');
@@ -187,11 +188,13 @@ if (process.argv.includes('--uninstall-cleanup')) {
 const { SettingsStore } = require('./app/settings-store.cjs');
 const settingsStore = new SettingsStore(TEST_ROOT ? path.join(TEST_ROOT, 'settings.json') : path.join(app.getPath('appData'), 'IslandHUD/settings.json'), { log: diag });
 const settings = settingsStore.value;
+const usageStore = new UsageStore(TEST_ROOT ? path.join(TEST_ROOT, 'usage.json') : path.join(app.getPath('appData'), 'IslandHUD/usage.json'), { log: diag });
 const settingsFile = () => settingsStore.file;
 const loadSettings = () => settingsStore.load();
 const saveSettings = () => settingsStore.save();
 // The integration manager must see saved settings, not constructor defaults.
 loadSettings();
+usageStore.load();
 // Isolated GUI runs pin the handoff countdown; the handoff runner overrides
 // this in its own process to exercise the opt-in behavior.
 if (TEST_ROOT && process.env.ISLAND_HUD_TEST_HANDOFF_SECONDS !== undefined) {
@@ -828,6 +831,7 @@ function startCodexAppServer() {
     server,
     onEvent: event => {
       sessionStore.applyEvent(event);
+      usageStore.recordEvent(event.provider, event.payload?.event);
       publishSessionsNow?.();
     },
     onApproval: approval => {
@@ -849,6 +853,7 @@ function startCodexAppServer() {
         approval.respond({ decision: 'cancel' });
         return;
       }
+      usageStore.recordRequest('codex', request.id, 'approval');
       codexAppRequestIds.add(request.id);
       const originalRespond = approval.respond;
       approval.respond = value => {
@@ -940,6 +945,7 @@ function settingsPayload() {
     dsh: dshIntegration.status(),
     zcode: zcodeIntegration.status(),
     codex: codexIntegration.status(),
+    usage: usageStore.snapshot(),
     displays: screen.getAllDisplays().length,
     displayOptions: displayChoices(),
     autoStart: !TEST_ROOT && app.isPackaged ? loginItemState() : false,
@@ -1097,6 +1103,7 @@ ipcMain.handle('island:updates:open', event => {
   if (!trustedSettings(event)) return false;
   shell.openExternal(updater.RELEASES_URL); return true;
 });
+ipcMain.handle('island:usage:reset', event => trustedSettings(event) ? usageStore.reset() : null);
 ipcMain.handle('island:dsh:status', event => trustedSettings(event) ? dshIntegration.status() : null);
 ipcMain.handle('island:dsh:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('DSH 集成管理只能从设置窗口操作');
@@ -1299,6 +1306,7 @@ app.whenReady().then(() => {
     helperPath: pipeHelperPath(), log: nativeLog,
     onChange: requests => {
       for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); codexIntegration.observe(request); }
+      for (const request of requests) usageStore.recordRequest(request.provider, request.requestId || request.id, request.kind);
       sessionStore.setRequests(requests);
       if (win && !win.isDestroyed()) win.webContents.send('island:native:requests', requests);
       publishSessions();
@@ -1308,6 +1316,7 @@ app.whenReady().then(() => {
       zcodeIntegration.observe(request);
       codexIntegration.observe(request);
       sessionStore.applyEvent(request);
+      usageStore.recordEvent(request.provider, request.payload?.event);
       const { event, requestId, outcome } = request.payload;
       if (requestId && ['ApprovalDecided', 'QuestionAnswered'].includes(event) && win && !win.isDestroyed()) {
         win.webContents.send('island:native:confirmation', { id: JSON.stringify([request.provider, requestId]), outcome });

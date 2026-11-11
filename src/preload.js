@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('island', {
     codexManage: (action) => ipcRenderer.invoke('island:codex:manage', action),
     checkUpdates: () => ipcRenderer.invoke('island:updates:check'),
     openUpdates: () => ipcRenderer.invoke('island:updates:open'),
+    resetUsage: () => ipcRenderer.invoke('island:usage:reset'),
     get: () => ipcRenderer.invoke('island:settings:get'),
     set: (patch) => ipcRenderer.invoke('island:settings:set', patch),
     onChange: cb => listen('island:settings:changed', cb),

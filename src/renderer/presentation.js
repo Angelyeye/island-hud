@@ -150,11 +150,18 @@
     return 'idle';
   }
   const providers = {
-    dsh: { chip: 'DSH', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
-    zcode: { chip: 'ZCode', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
-    codex: { chip: 'Codex', title: 'Codex 会话', subtitle: 'OpenAI Codex', focus: '在 Codex 中', view: '在 Codex 查看' },
+    dsh: { chip: 'DSH', glyph: 'D', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
+    zcode: { chip: 'ZCode', glyph: 'Z', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
+    codex: { chip: 'Codex', glyph: 'C', title: 'Codex 会话', subtitle: 'OpenAI Codex', focus: '在 Codex 中', view: '在 Codex 查看' },
   };
   const meta = provider => providers[provider] || { chip: provider ? String(provider).toUpperCase() : 'HUD', title: '会话', subtitle: provider || '', focus: '在客户端', view: '在客户端查看' };
+  function providerChip(provider) {
+    const pm = meta(provider);
+    return { tag: 'span', attrs: { class: 'source-chip provider-chip provider-' + (provider || 'unknown'), title: pm.subtitle }, kids: [
+      { tag: 'span', attrs: { class: 'provider-mark', 'aria-hidden': 'true' }, kids: [pm.glyph || pm.chip.slice(0, 1)] },
+      { tag: 'span', kids: [pm.chip] },
+    ] };
+  }
   function wave(phase = 'idle') {
     return { tag: 'span', attrs: { class: 'status-wave phase-' + (phase || 'idle'), 'aria-hidden': 'true' },
       kids: [7, 13, 19, 11, 6].map((h, i) => ({ tag: 'i', attrs: { style: '--bar:' + h + 'px;--delay:' + (-i * .17) + 's' } })) };
@@ -169,7 +176,7 @@
         { tag: 'h1', attrs: { title: project + ' · ' + title }, kids: [project === title ? title : project + ' · ' + title] },
         { tag: 'p', kids: [session.lastUserText ? '你：' + session.lastUserText : options.subtitle || pm.subtitle] },
       ] },
-      { tag: 'span', attrs: { class: 'source-chip' }, kids: [pm.chip] },
+      providerChip(session.provider),
       ...controls,
     ] };
   }
@@ -203,5 +210,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, dshRepairPending, attentionPhase, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, dshRepairPending, attentionPhase, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, providerChip, wave, header, DisplayPolicy };
 });

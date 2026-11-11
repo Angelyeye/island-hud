@@ -116,7 +116,7 @@ app.whenReady().then(async () => {
       permission_mode: 'default', tool_name: 'Bash', tool_input: { command: 'cargo build', description: 'build the workspace' },
     });
     await until(async () => !!pendingOf(await snapshot(), 'codex', 'approval'));
-    await until(() => win.webContents.executeJavaScript('[...document.querySelectorAll(".source-chip")].some(el => el.textContent === "Codex")'));
+    await until(() => win.webContents.executeJavaScript('[...document.querySelectorAll(".source-chip")].some(el => el.textContent.includes("Codex"))'));
     await clickNativeAction('allow');
     const codexOut = await Promise.race([codexAllow, pause(4000).then(() => ({ out: '', err: 'timeout' }))]);
     assert.equal(codexOut.code, 0);
@@ -130,7 +130,7 @@ app.whenReady().then(async () => {
       tool_name: 'Bash', tool_input: { command: 'git push --force' },
     });
     await until(async () => !!pendingOf(await snapshot(), 'zcode', 'approval'));
-    await until(() => win.webContents.executeJavaScript('[...document.querySelectorAll(".source-chip")].some(el => el.textContent === "ZCode")'));
+    await until(() => win.webContents.executeJavaScript('[...document.querySelectorAll(".source-chip")].some(el => el.textContent.includes("ZCode"))'));
     await clickNativeAction('deny');
     const zcodeOut = await Promise.race([zcodeDeny, pause(4000).then(() => ({ out: '', err: 'timeout' }))]);
     assert.equal(JSON.parse(zcodeOut.out).hookSpecificOutput.decision.behavior, 'deny');

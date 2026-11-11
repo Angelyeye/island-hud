@@ -43,8 +43,6 @@ contextBridge.exposeInMainWorld('island', {
     dshManage: (action) => ipcRenderer.invoke('island:dsh:manage', action),
     zcodeStatus: () => ipcRenderer.invoke('island:zcode:status'),
     zcodeManage: (action) => ipcRenderer.invoke('island:zcode:manage', action),
-    claudeStatus: () => ipcRenderer.invoke('island:claude:status'),
-    claudeManage: (action) => ipcRenderer.invoke('island:claude:manage', action),
     codexStatus: () => ipcRenderer.invoke('island:codex:status'),
     codexManage: (action) => ipcRenderer.invoke('island:codex:manage', action),
     get: () => ipcRenderer.invoke('island:settings:get'),

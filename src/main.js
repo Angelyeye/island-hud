@@ -20,12 +20,12 @@ const updater = require('./update/updater');
 const { SessionStore } = require('./sessions/session-store.cjs');
 const { DshIntegrationManager } = require('./app/dsh-integration-manager.cjs');
 const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs');
-const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { openCodexThread } = require('./app/codex-client.cjs');
 const { loginItemEnabled } = require('./app/login-item-state.cjs');
 const { trustedOverlay: isTrustedOverlay, trustedSettings: isTrustedSettings } = require('./app/ipc-authorization.cjs');
+const { ACTIVE_PROVIDERS } = require('./integrations/contract');
 const { clientPath: zcodeClientPath, openWorkspace: zcodeOpenWorkspace } = require('./app/zcode-client.cjs');
 const { ArchiveStore, canHide } = require('./app/archive-store.cjs');
 const { applyVisibility, DEFAULT_LIMIT: SESSION_LIMIT } = require('./sessions/session-visibility.cjs');
@@ -158,16 +158,6 @@ function createZcodeIntegration() {
     log: diag,
   });
 }
-function createClaudeIntegration() {
-  return new ClaudeIntegrationManager({
-    configPath: TEST_ROOT ? path.join(TEST_ROOT, 'claude/settings.json')
-      : path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'settings.json'),
-    dataDir: DATA_DIR,
-    sourceDir: path.join(__dirname, '../integrations/claude'),
-    descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
-    log: diag,
-  });
-}
 function createCodexIntegration() {
   return new CodexIntegrationManager({
     configPath: TEST_ROOT ? path.join(TEST_ROOT, 'codex/hooks.json')
@@ -182,7 +172,6 @@ if (process.argv.includes('--uninstall-cleanup')) {
   try {
     createDshIntegration().remove();
     createZcodeIntegration().remove();
-    createClaudeIntegration().remove();
     createCodexIntegration().remove();
     if (!TEST_ROOT) {
       const ownStartup = app.getLoginItemSettings({ path: process.execPath, name: 'Island HUD' });
@@ -809,7 +798,7 @@ function createTray() {
   }
 }
 
-/* ------------------------------------------------ Claude Code hook installer UI */
+/* ------------------------------------------------ integration installer UI */
 function toolPath(name) {
   let p = path.join(__dirname, 'tools', name);
   if (p.includes('app.asar')) p = p.replace('app.asar', 'app.asar.unpacked');
@@ -822,7 +811,6 @@ function pipeHelperPath() {
 
 const dshIntegration = createDshIntegration({ timedQuestions: settings.dshTimedQuestions === true });
 const zcodeIntegration = createZcodeIntegration();
-const claudeIntegration = createClaudeIntegration();
 const codexIntegration = createCodexIntegration();
 
 /* ----------------------------------------------------------------- diagnostics */
@@ -867,7 +855,6 @@ function settingsPayload() {
     dshTimedQuestions: settings.dshTimedQuestions === true,
     dsh: dshIntegration.status(),
     zcode: zcodeIntegration.status(),
-    claude: claudeIntegration.status(),
     codex: codexIntegration.status(),
     displays: screen.getAllDisplays().length,
     displayOptions: displayChoices(),
@@ -957,7 +944,7 @@ ipcMain.handle('island:focus', async (event, id) => {
   if (session.provider === 'zcode') {
     const client = workspace ? zcodeClientPath() : null;
     if (client && zcodeOpenWorkspace(client, workspace)) return { status: 'navigated', sessionId: session.rawId };
-  } else if (session.provider !== 'claude') {
+  } else {
     if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
       reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
     const navigation = dshNavigation.request(session.rawId, 2500);
@@ -1032,13 +1019,6 @@ ipcMain.handle('island:zcode:manage', (event, action) => {
   if (action === 'install' || action === 'repair') return zcodeIntegration.install();
   if (action === 'remove') return zcodeIntegration.remove();
   throw new Error('未知的 ZCode 集成操作');
-});
-ipcMain.handle('island:claude:status', event => trustedSettings(event) ? claudeIntegration.status() : null);
-ipcMain.handle('island:claude:manage', (event, action) => {
-  if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Claude Code 集成管理只能从设置窗口操作');
-  if (action === 'install' || action === 'repair') return claudeIntegration.install();
-  if (action === 'remove') return claudeIntegration.remove();
-  throw new Error('未知的 Claude Code 集成操作');
 });
 ipcMain.handle('island:codex:status', event => trustedSettings(event) ? codexIntegration.status() : null);
 ipcMain.handle('island:codex:manage', (event, action) => {
@@ -1220,11 +1200,11 @@ app.whenReady().then(() => {
   };
   publishSessionsNow = publishSessions;
   integrationHub = new IntegrationHub({
-    allowedProviders: ['dsh', 'zcode', 'claude', 'codex'],
+    allowedProviders: ACTIVE_PROVIDERS,
     descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
     helperPath: pipeHelperPath(), log: nativeLog,
     onChange: requests => {
-      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); claudeIntegration.observe(request); codexIntegration.observe(request); }
+      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); codexIntegration.observe(request); }
       sessionStore.setRequests(requests);
       if (win && !win.isDestroyed()) win.webContents.send('island:native:requests', requests);
       publishSessions();
@@ -1232,7 +1212,6 @@ app.whenReady().then(() => {
     onEvent: request => {
       dshIntegration.observe(request);
       zcodeIntegration.observe(request);
-      claudeIntegration.observe(request);
       codexIntegration.observe(request);
       sessionStore.applyEvent(request);
       const { event, requestId, outcome } = request.payload;

@@ -1,5 +1,9 @@
 'use strict';
-const PROVIDERS = new Set(['dsh', 'zcode', 'claude', 'codex']);
+// The product surface intentionally supports these three agents. Claude
+// remains in the protocol set so legacy fixtures and old local archives can
+// still be read without destructive migration.
+const ACTIVE_PROVIDERS = Object.freeze(['dsh', 'zcode', 'codex']);
+const PROVIDERS = new Set([...ACTIVE_PROVIDERS, 'claude']);
 const MAX_FRAME_BYTES = 512 * 1024;
 // ZCode, Claude Code and Codex hook clients block the agent's own tool call
 // while the island card is open, so they may legitimately wait far longer
@@ -78,4 +82,4 @@ function validateDecision(request, decision, extra = {}) {
   if (request.kind !== 'question' || decision !== 'answer') throw new Error('Invalid decision');
   return { decision: 'answer', answers: answersOf(request.payload.questions, extra.answers) };
 }
-module.exports = { PROVIDERS, TIMEOUT_MS, timeoutFor, MAX_FRAME_BYTES, keyOf, sessionKey, questionsOf, answersOf, validateRequest, validateDecision };
+module.exports = { ACTIVE_PROVIDERS, PROVIDERS, TIMEOUT_MS, timeoutFor, MAX_FRAME_BYTES, keyOf, sessionKey, questionsOf, answersOf, validateRequest, validateDecision };

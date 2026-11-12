@@ -71,13 +71,20 @@ test('layout uses logical pixels and bounds both density modes inside a small wo
 });
 test('display targeting keeps a connected choice and falls back to the primary display', () => {
   const primary = { id: 1, bounds: { x: 0, y: 0, width: 1920, height: 1080 } };
-  const secondary = { id: 2, bounds: { x: 1920, y: 0, width: 2560, height: 1440 } };
+  const secondary = { id: 2, label: 'Desk', bounds: { x: 1920, y: 0, width: 2560, height: 1440 }, workArea: { x: 1920, y: 0, width: 2560, height: 1400 }, scaleFactor: 1.5, rotation: 0 };
   assert.equal(P.selectDisplay([primary, secondary], 2, primary), secondary);
   assert.equal(P.selectDisplay([primary, secondary], 99, primary), primary);
   assert.equal(P.selectDisplay([primary, secondary], null, primary), primary);
   assert.equal(P.selectDisplay([], 2, primary), primary);
   assert.equal(P.selectDisplay('not-a-list', 2, primary), primary);
+  const reconnected = { ...secondary, id: 99, bounds: { x: -2560, y: -200, width: 2560, height: 1440 }, workArea: { x: -2560, y: -200, width: 2560, height: 1400 } };
+  const fingerprint = P.displayFingerprint(secondary);
+  assert.equal(P.selectDisplay([primary, reconnected], 2, primary, fingerprint), reconnected);
+  assert.deepEqual(P.centeredBounds({ x: -2560, y: -200, width: 2560, height: 1400 }, 568, 624), { x: -1564, y: 188, width: 568, height: 624 });
+  assert.equal(P.displayFingerprint(secondary), P.displayFingerprint(reconnected));
   assert.equal(P.normalize({ displayId: 2 }).displayId, 2);
+  assert.equal(P.normalize({ displayFingerprint: fingerprint }).displayFingerprint, fingerprint);
+  assert.equal(P.normalize({ displayFingerprint: 'x'.repeat(501) }).displayFingerprint, null);
   assert.equal(P.normalize({ displayId: -1 }).displayId, -1);
   assert.equal(P.normalize({ displayId: 2.5 }).displayId, null);
   assert.equal(P.normalize({ displayId: '2' }).displayId, null);

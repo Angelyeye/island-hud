@@ -16,7 +16,8 @@ test('settings migrate in place preserving user choices and unknown keys; a fres
   const reference = store.value; store.load();
   assert.equal(store.value, reference); assert.equal(store.value.customSetting, 'kept');
   assert.equal(store.value.displayId, 42); assert.equal(store.value.autoHideFullscreen, true);
-  assert.equal(store.value.autoCheckUpdates, true); assert.equal(store.value.settingsVersion, 3);
+  assert.equal(store.value.displayFingerprint, null);
+  assert.equal(store.value.autoCheckUpdates, true); assert.equal(store.value.settingsVersion, 4);
   assert.equal(store.value.panelDensity, 'comfortable'); assert.equal(store.value.dshTimedQuestions, false);
   assert.equal(store.value.completionReveal, 'glance');
   assert.equal(store.value.approvalHandoffSeconds, 0);

@@ -7,16 +7,17 @@
   const DEFAULTS = Object.freeze({ panelDensity: 'comfortable', contentFontSize: 13, maxPanelHeight: 560,
     expandOnHover: true, autoCollapseOnLeave: true, completionReveal: 'glance', completionView: 'markdown-summary',
     completionDwellMs: 5000, motionMode: 'system', notificationSound: 'off', settingsTheme: 'system', autoHideWhenIdle: false,
-    approvalHandoffSeconds: 0, displayId: null });
+    approvalHandoffSeconds: 0, displayId: null, displayFingerprint: null, autoRepairMode: 'startup-and-settings' });
   const choices = { panelDensity: ['comfortable', 'compact'], completionReveal: ['glance', 'expanded'],
     completionView: ['markdown-summary', 'text-summary', 'full'], motionMode: ['system', 'reduced', 'full'], notificationSound: ['off', 'soft', 'full'],
-    settingsTheme: ['system', 'dark', 'light'] };
+    settingsTheme: ['system', 'dark', 'light'], autoRepairMode: ['startup-and-settings', 'manual'] };
   function normalize(input = {}) {
     const result = {};
     for (const [key, fallback] of Object.entries(DEFAULTS)) {
       const value = input[key];
       result[key] = choices[key] ? choices[key].includes(value) ? value : fallback
         : typeof fallback === 'boolean' ? typeof value === 'boolean' ? value : fallback
+        : key === 'displayFingerprint' ? typeof value === 'string' ? value : fallback
         : Number.isFinite(value) ? value : fallback;
     }
     result.contentFontSize = Math.round(Math.max(11, Math.min(16, result.contentFontSize)));
@@ -26,6 +27,8 @@
     // card counts down and returns the request to the client's native UI.
     result.approvalHandoffSeconds = Math.round(Math.max(0, Math.min(120, result.approvalHandoffSeconds)));
     result.displayId = Number.isInteger(result.displayId) ? result.displayId : null;
+    result.displayFingerprint = typeof result.displayFingerprint === 'string' && result.displayFingerprint.length <= 500
+      ? result.displayFingerprint : null;
     return result;
   }
   function dshRepairPending(value = {}) {
@@ -33,14 +36,31 @@
       && value.dshTimedQuestions !== value.dsh.configuredTimedQuestions;
   }
   // Display IDs are runtime identifiers, not stable across reconnects. Keep the
-  // chosen ID while it exists, then fall back to the primary display.
-  function selectDisplay(displays, id, primary) {
+  // chosen ID while it exists, then fall back to a hardware/geometry fingerprint
+  // before using the primary display.
+  function displayFingerprint(display) {
+    const value = display || {}, bounds = value.bounds || {}, work = value.workArea || {};
+    const label = String(value.label || '').trim().toLowerCase();
+    const scale = Number.isFinite(value.scaleFactor) ? Number(value.scaleFactor).toFixed(3) : '1.000';
+    const rotation = Number.isFinite(value.rotation) ? Number(value.rotation) : 0;
+    return [label, bounds.width || 0, bounds.height || 0, work.width || 0, work.height || 0, scale, rotation].join('|');
+  }
+  function selectDisplay(displays, id, primary, fingerprint = null) {
     const list = Array.isArray(displays) ? displays : [];
     if (Number.isInteger(id)) {
       const selected = list.find(display => display.id === id);
       if (selected) return selected;
     }
+    if (typeof fingerprint === 'string' && fingerprint) {
+      const selected = list.find(display => displayFingerprint(display) === fingerprint);
+      if (selected) return selected;
+    }
     return primary || list[0] || null;
+  }
+  function centeredBounds(workArea = {}, width = 0, height = 0) {
+    const area = workArea || {}, x = Number(area.x) || 0, y = Number(area.y) || 0;
+    const areaWidth = Number(area.width) || width, areaHeight = Number(area.height) || height;
+    return { x: Math.round(x + (areaWidth - width) / 2), y: Math.round(y + (areaHeight - height) / 2), width, height };
   }
   function geometry(input = {}, environment = {}) {
     const settings = normalize(input), compact = settings.panelDensity === 'compact';
@@ -153,6 +173,8 @@
     dsh: { chip: 'DSH', glyph: 'D', title: 'DSH 会话', subtitle: 'DeepSeek Harness', focus: '在 DSH 中', view: '在 DSH 查看' },
     zcode: { chip: 'ZCode', glyph: 'Z', title: 'ZCode 会话', subtitle: 'ZCode', focus: '在 ZCode 中', view: '在 ZCode 查看' },
     codex: { chip: 'Codex', glyph: 'C', title: 'Codex 会话', subtitle: 'OpenAI Codex', focus: '在 Codex 中', view: '在 Codex 查看' },
+    claude: { chip: 'Claude', glyph: 'A', title: 'Claude 会话', subtitle: 'Claude Code', focus: '在 Claude Code 中', view: '在 Claude Code 查看' },
+    chatgpt: { chip: 'ChatGPT', glyph: 'G', title: 'ChatGPT 会话', subtitle: 'Chat / Work', focus: '在 ChatGPT 中', view: '在 ChatGPT 查看' },
   };
   const meta = provider => providers[provider] || { chip: provider ? String(provider).toUpperCase() : 'HUD', title: '会话', subtitle: provider || '', focus: '在客户端', view: '在客户端查看' };
   function providerChip(provider) {
@@ -210,5 +232,5 @@
     }
     get scheduled() { return this.hoverAt !== null || this.leaveAt !== null || !!this.completion; }
   }
-  return { DEFAULTS, normalize, dshRepairPending, attentionPhase, geometry, selectDisplay, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, providerChip, wave, header, DisplayPolicy };
+  return { DEFAULTS, normalize, dshRepairPending, attentionPhase, geometry, displayFingerprint, selectDisplay, centeredBounds, escape, safeLink, material, markdown, plain, summary, labels, providers, meta, providerChip, wave, header, DisplayPolicy };
 });

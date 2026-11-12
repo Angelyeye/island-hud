@@ -1,9 +1,10 @@
 'use strict';
-// The product surface intentionally supports these three agents. Claude
-// remains in the protocol set so legacy fixtures and old local archives can
-// still be read without destructive migration.
-const ACTIVE_PROVIDERS = Object.freeze(['dsh', 'zcode', 'codex']);
-const PROVIDERS = new Set([...ACTIVE_PROVIDERS, 'claude']);
+// The product surface supports DSH, ZCode, Codex, Claude Code and ChatGPT
+// bridge sessions. Keep the
+// provider set centralized so transport validation, usage accounting and the
+// renderer can agree on the same active integration surface.
+const ACTIVE_PROVIDERS = Object.freeze(['dsh', 'zcode', 'codex', 'claude', 'chatgpt']);
+const PROVIDERS = new Set(ACTIVE_PROVIDERS);
 const MAX_FRAME_BYTES = 512 * 1024;
 // ZCode, Claude Code and Codex hook clients block the agent's own tool call
 // while the island card is open, so they may legitimately wait far longer
@@ -12,6 +13,7 @@ const TIMEOUT_MS = {
   dsh: { approval: 120000, question: 600000 },
   zcode: { approval: 24 * 3600000, question: 24 * 3600000 },
   claude: { approval: 24 * 3600000, question: 24 * 3600000 },
+  chatgpt: { approval: 24 * 3600000, question: 24 * 3600000 },
   codex: { approval: 6 * 3600000, question: 6 * 3600000 },
 };
 function timeoutFor(provider, kind) {
@@ -66,7 +68,8 @@ function validateRequest(msg) {
   const timeoutMs = timeoutFor(msg.provider, msg.kind);
   const payload = { ...(msg.payload || {}) };
   if (msg.kind === 'question') payload.questions = questionsOf(payload.questions);
-  return { provider: msg.provider, requestId: msg.id, id: keyOf(msg.provider, msg.id),
+  const surface = typeof msg.surface === 'string' && msg.surface.length <= 120 ? msg.surface : undefined;
+  return { provider: msg.provider, ...(surface ? { surface } : {}), requestId: msg.id, id: keyOf(msg.provider, msg.id),
     sessionId: msg.sessionId || null, sessionKey: sessionKey(msg.provider, msg.sessionId),
     kind: msg.kind, blocking: msg.blocking !== false, payload,
     at: msg.kind === 'event' && Number.isSafeInteger(msg.at) && msg.at > 0 && msg.at <= Date.now() + 1000 ? msg.at : Date.now(),

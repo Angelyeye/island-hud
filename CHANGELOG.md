@@ -13,6 +13,9 @@
 - **可选通知声音**：完成、审批和提问等状态变化支持单独开启通知声音。
 - **Codex Desktop 实时桥接**：接入 app-server 的 thread、turn、item 状态和命令审批，桥接不可用时自动回退 hook 模式。
 - **Codex 会话跳转**：点击 Codex 会话时优先打开对应的 `codex://threads/<sessionId>` 深链接。
+- **Claude Code 集成**：新增 Claude Code hook 安装、修复、卸载、审批、AskUserQuestion 和会话状态支持。
+- **ChatGPT Chat / Work MCP bridge**：支持 ChatGPT 主动调用 Island HUD 工具，显示显式 bridge 会话、审批、问答和完成状态。
+- **多显示器增强**：支持显示器 fingerprint 恢复、负坐标/竖屏/缩放信息、目标屏设置窗口定位和完整显示器诊断。
 
 ### 修复与改进
 
@@ -20,6 +23,7 @@
 - 将使用量去重范围限定为 provider，避免不同客户端之间的请求 ID 冲突。
 - 修复 Electron 依赖树中的传递依赖漏洞，并同步更新锁文件。
 - 更新界面与 provider 资产，使会话状态、使用量和通知设置在同一套视觉层级中呈现。
+- 增加集成健康摘要、自动修复模式和最近修复记录。
 
 ## [0.3.3] - 2026-10-26
 

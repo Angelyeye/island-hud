@@ -32,7 +32,7 @@
 
 Island HUD is an island-shaped card that lives at the top of your Windows screen: it collapses into a narrow strip while idle and expands into an approval or question card when a decision is needed. Allow once, deny, or pick an answer — no more switching back to the terminal to hunt for the window that is waiting on you.
 
-It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCode / Codex (via hook configuration)** into a single list, so the runtime status, pending requests, and finished results of every client stay visible on the same island.
+It merges sessions from **DeepSeek Harness (DSH)**, **ZCode / Codex / Claude Code**, and explicitly bridged ChatGPT Chat / Work conversations into a single list, so runtime status, pending requests, and finished results stay visible on the same island.
 
 > [!IMPORTANT]
 > **Unofficial notice**: Island HUD is an independent community open-source project. It is not affiliated with DeepSeek, ZCode, or any other product, company, or team, and it has not received endorsement, authorization, or support from any of them in any form.
@@ -65,8 +65,9 @@ It merges sessions from **DeepSeek Harness (DSH, via native plugin)** and **ZCod
 | **DeepSeek Harness** | Local native plugin | Session status · permission approval · multi-question prompts<br><sub>supports timed non-blocking mode</sub> | Jumps to the exact session |
 | **ZCode** | Writes hook configuration | Session status · permission approval · multi-question prompts<br><sub>answers are returned through the approval surface, experimental</sub> | Opens the project directory of the session |
 
-| **Codex** | Hooks + app-server | Session status · approvals · live Desktop thread/turn state<br><sub>trust hooks once via /hooks; enable the Desktop bridge</sub> | Prefers `codex://threads/<sessionId>` |
-| ~~ChatGPT desktop~~ | No official interface | ——<br><sub>no local integration surface, not supported</sub> | —— |
+| **Codex / ChatGPT Desktop Codex** | Hooks + app-server | Session status · approvals · live Desktop thread/turn state<br><sub>same Codex channel; trust hooks once via /hooks</sub> | Prefers `codex://threads/<sessionId>` |
+| **Claude Code** | Writes hook configuration | Session status · approvals · AskUserQuestion · completion state | Opens the project directory |
+| **ChatGPT Chat / Work** | Explicit MCP bridge | Bridge session status · approvals · questions · completion notices<br><sub>only sessions that actively call Island HUD tools</sub> | Copies the session ID or returns to ChatGPT |
 
 All clients share the same loopback channel and the same island. The list sorts pending work first, with the most recently active on top; when one client has many sessions, up to 50 are shown at a time.
 
@@ -157,9 +158,11 @@ The plugin writes to the DSH configuration in a managed way. Uninstalling is a s
 
 </details>
 
-### ChatGPT desktop · not supported
+### ChatGPT Desktop · Codex and Chat / Work bridge
 
-The ChatGPT desktop app (Windows) exposes no official local integration surface (no hooks, no automation API), so a third-party app cannot mirror its status or answer approvals on its behalf. The integratable OpenAI entity is the **Codex CLI** (covered above).
+The Codex view inside ChatGPT Desktop reuses Island HUD's existing Codex hooks and app-server bridge. Chat / Work conversations can enter the island after you enable the local MCP bridge and ChatGPT actively calls `island_session_*`, `island_request_approval`, or `island_request_question`; ordinary conversations that never call the bridge are not mirrored passively.
+
+The settings page shows the local endpoint, bearer token, and bridge health. Connecting ChatGPT requires a workspace that allows custom MCP and a supported HTTPS endpoint or Secure MCP Tunnel. Island HUD never exposes its local port publicly by itself.
 
 ### Client approval handoff (optional, off by default)
 
@@ -236,7 +239,7 @@ No. Archive and delete only affect what the island shows: records stay on this m
 <details>
 <summary><b>Are macOS / Linux or other clients supported?</b></summary>
 
-Only DSH, ZCode, and Codex CLI on Windows 10 / 11 are supported today. Other systems and clients are out of scope, with no roadmap commitment.
+Only DSH, ZCode, Codex/ChatGPT Desktop Codex, Claude Code, and explicitly bridged ChatGPT Chat / Work sessions on Windows 10 / 11 are supported today. Other systems and clients are out of scope, with no roadmap commitment.
 </details>
 
 ## Known limitations

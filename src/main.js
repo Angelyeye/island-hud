@@ -12,6 +12,7 @@ const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, nativeThem
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { randomBytes } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const { DshBridge, zstdDecoderName } = require('./dsh/dshBridge');
 const { IntegrationHub } = require('./integrations/hub');
@@ -21,8 +22,10 @@ const { SessionStore } = require('./sessions/session-store.cjs');
 const { DshIntegrationManager } = require('./app/dsh-integration-manager.cjs');
 const { ZcodeIntegrationManager } = require('./app/zcode-integration-manager.cjs');
 const { CodexIntegrationManager } = require('./app/codex-integration-manager.cjs');
+const { ClaudeIntegrationManager } = require('./app/claude-integration-manager.cjs');
 const { CodexAppServer } = require('./app/codex-app-server.cjs');
 const { CodexAppServerBridge } = require('./app/codex-app-server-bridge.cjs');
+const { ChatGptMcpBridge, ChatGptMcpHttpServer } = require('./app/chatgpt-mcp-bridge.cjs');
 const { UsageStore } = require('./app/usage-store.cjs');
 const { DshNavigationServer } = require('./app/dsh-navigation.cjs');
 const { openCodexThread } = require('./app/codex-client.cjs');
@@ -171,11 +174,22 @@ function createCodexIntegration() {
     log: diag,
   });
 }
+function createClaudeIntegration() {
+  return new ClaudeIntegrationManager({
+    configPath: TEST_ROOT ? path.join(TEST_ROOT, 'claude/settings.json')
+      : path.join(process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude'), 'settings.json'),
+    dataDir: DATA_DIR,
+    sourceDir: path.join(__dirname, '../integrations/claude'),
+    descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
+    log: diag,
+  });
+}
 if (process.argv.includes('--uninstall-cleanup')) {
   try {
     createDshIntegration().remove();
     createZcodeIntegration().remove();
     createCodexIntegration().remove();
+    createClaudeIntegration().remove();
     if (!TEST_ROOT) {
       const ownStartup = app.getLoginItemSettings({ path: process.execPath, name: 'Island HUD' });
       if (ownStartup.launchItems?.some(item => item.path?.toLowerCase() === process.execPath.toLowerCase())) {
@@ -227,19 +241,45 @@ function visibleSessions() {
 
 function targetDisplay() {
   const displays = screen.getAllDisplays();
-  return presentation.selectDisplay(displays, settings.displayId, screen.getPrimaryDisplay()) || screen.getPrimaryDisplay();
+  return presentation.selectDisplay(displays, settings.displayId, screen.getPrimaryDisplay(), settings.displayFingerprint) || screen.getPrimaryDisplay();
+}
+
+function targetDisplayWasFallback() {
+  const target = targetDisplay();
+  return Number.isInteger(settings.displayId) && target.id !== settings.displayId;
+}
+
+function syncDisplayIdentity() {
+  if (!Number.isInteger(settings.displayId) || !settings.displayFingerprint) return false;
+  const target = screen.getAllDisplays().find(display => presentation.displayFingerprint(display) === settings.displayFingerprint);
+  if (!target || target.id === settings.displayId) return false;
+  const previous = settings.displayId;
+  settings.displayId = target.id;
+  saveSettings();
+  diag(`display restored by fingerprint old=${previous} new=${target.id}`);
+  return true;
+}
+
+function displayInfo(display, primary = screen.getPrimaryDisplay()) {
+  return {
+    id: display.id,
+    label: display.label || '显示器',
+    bounds: { ...display.bounds },
+    workArea: { ...display.workArea },
+    scaleFactor: display.scaleFactor,
+    rotation: Number.isFinite(display.rotation) ? display.rotation : 0,
+    primary: display.id === primary.id,
+    fingerprint: presentation.displayFingerprint(display),
+  };
 }
 
 function displayChoices() {
   const primary = screen.getPrimaryDisplay();
   return screen.getAllDisplays().map((display, index) => ({
-    id: display.id,
+    ...displayInfo(display, primary),
     index: index + 1,
-    label: display.label || '显示器',
     width: display.bounds.width,
     height: display.bounds.height,
-    scaleFactor: display.scaleFactor,
-    primary: display.id === primary.id,
   }));
 }
 
@@ -335,6 +375,7 @@ let dshNavigation = null;
 let integrationHub = null;
 let codexAppServer = null;
 let codexAppBridge = null;
+let codexSurface = 'codex-desktop';
 let codexAppRestartTimer = null;
 let codexAppRestartAttempt = 0;
 let sessionPublishTimer = null;
@@ -361,6 +402,7 @@ let lastEnvironment = '';
 function environmentPayload() {
   const display = targetDisplay();
   return { workArea: display.workArea, scaleFactor: display.scaleFactor, displayOptions: displayChoices(),
+    targetDisplay: displayInfo(display), targetWasFallback: targetDisplayWasFallback(),
     dark: nativeTheme.shouldUseDarkColors,
     reducedMotion: systemPreferences.getAnimationSettings().shouldRenderRichAnimation === false, visible: visible && !!win?.isVisible(), windowBounds: win?.getBounds() || null };
 }
@@ -540,7 +582,9 @@ function createWindow() {
 }
 
 function onDisplaysChanged() {
+  syncDisplayIdentity();
   reposition();
+  repositionSettingsWindow();
   completionReader.clear();
   publishEnvironment();
   tray?.setContextMenu(buildTrayMenu());
@@ -566,6 +610,16 @@ function reposition() {
     });
   }
   publishEnvironment();
+}
+
+function repositionSettingsWindow() {
+  if (!settingsWin || settingsWin.isDestroyed()) return;
+  const display = targetDisplay();
+  const area = display.workArea;
+  const current = settingsWin.getBounds();
+  const width = Math.min(current.width, Math.max(360, area.width - 32));
+  const height = Math.min(current.height, Math.max(420, area.height - 40));
+  settingsWin.setBounds(presentation.centeredBounds(area, width, height));
 }
 
 function syncInteractive() {
@@ -715,8 +769,12 @@ function displayMenuItems() {
     checked: d.id === current.id,
     click: () => {
       settings.displayId = d.id;
+        settings.displayFingerprint = presentation.displayFingerprint(d);
       saveSettings();
       reposition();
+        repositionSettingsWindow();
+        publishEnvironment();
+        publishSettings();
       tray?.setContextMenu(buildTrayMenu());
       diag('display selected id=' + d.id);
     },
@@ -821,7 +879,151 @@ function pipeHelperPath() {
 const dshIntegration = createDshIntegration({ timedQuestions: settings.dshTimedQuestions === true });
 const zcodeIntegration = createZcodeIntegration();
 const codexIntegration = createCodexIntegration();
+const claudeIntegration = createClaudeIntegration();
+let chatgptMcpBridge = null;
+let chatgptMcpHttpServer = null;
+const chatgptSessionPhases = new Map();
+const repairHistoryFile = () => path.join(DATA_DIR, 'repair-history.json');
+
+function readRepairHistory() {
+  try {
+    const value = JSON.parse(fs.readFileSync(repairHistoryFile(), 'utf8'));
+    return Array.isArray(value) ? value.slice(-100) : [];
+  } catch { return []; }
+}
+
+function recordRepair(entry) {
+  const history = [...readRepairHistory(), { timestamp: Date.now(), ...entry }].slice(-100);
+  try {
+    fs.mkdirSync(path.dirname(repairHistoryFile()), { recursive: true });
+    fs.writeFileSync(repairHistoryFile(), JSON.stringify(history, null, 2) + '\n', { mode: 0o600 });
+  } catch (error) { diag('repair history write failed: ' + error.message); }
+}
+
+async function autoRepairIntegrations(trigger = 'startup') {
+  if (settings.autoRepairMode === 'manual') return [];
+  const integrations = [['dsh', dshIntegration], ['zcode', zcodeIntegration], ['codex', codexIntegration], ['claude', claudeIntegration]];
+  const results = [];
+  for (const [provider, manager] of integrations) {
+    let status;
+    try { status = manager.status(); } catch (error) { recordRepair({ provider, trigger, action: 'check', reasonCode: 'status-error', result: 'failed', error: error.message }); continue; }
+    const versionMismatch = status?.hostVersion && status?.version && status.hostVersion !== status.version;
+    const needsRepair = versionMismatch || !status?.installed || status?.reason?.includes('修复') || status?.reason?.includes('未完成');
+    if (!(status?.managed || status?.version) || !needsRepair) continue;
+    try {
+      const result = manager.install();
+      const value = result && typeof result.then === 'function' ? await result : result;
+      const changed = value?.changed === true;
+      recordRepair({ provider, trigger, action: 'repair', reasonCode: changed ? 'managed-config-incomplete' : 'already-consistent', result: 'success', backupDir: value?.backupDir || '', restartRequired: value?.restartRequired === true });
+      results.push({ provider, changed, status: value });
+    } catch (error) {
+      recordRepair({ provider, trigger, action: 'repair', reasonCode: 'repair-failed', result: 'failed', error: error.message });
+      diag(`${provider} auto repair failed: ${error.message}`);
+    }
+  }
+  if (results.length) publishSettings();
+  return results;
+}
 const codexAppRequestIds = new Set();
+
+function chatgptMcpSettings() {
+  if (!settings.chatgptMcp || typeof settings.chatgptMcp !== 'object' || Array.isArray(settings.chatgptMcp)) {
+    settings.chatgptMcp = { enabled: false, endpoint: '', token: '', transport: 'streamable-http', port: 0 };
+  }
+  return settings.chatgptMcp;
+}
+
+function syncChatGptSessions(sessions = chatgptMcpBridge?.snapshot?.() || []) {
+  const nextPhases = new Map();
+  for (const session of sessions) {
+    const previous = chatgptSessionPhases.get(session.sessionId);
+    nextPhases.set(session.sessionId, session.phase);
+    if (!previous) usageStore.recordEvent('chatgpt', 'SessionStart', session.surface);
+    if (session.phase === 'completed' && previous !== 'completed') usageStore.recordEvent('chatgpt', 'Stop', session.surface);
+  }
+  chatgptSessionPhases.clear();
+  for (const [id, phase] of nextPhases) chatgptSessionPhases.set(id, phase);
+  const list = sessions.map(session => ({
+    rawId: session.sessionId,
+    title: session.title || session.conversationId,
+    project: session.projectId || (session.surface === 'work' ? 'ChatGPT Work' : 'ChatGPT Chat'),
+    phase: session.phase || 'idle',
+    updatedAt: session.updatedAt || Date.now(),
+    completedAt: session.completedAt || 0,
+    lastAssistantText: session.summary || '',
+    surface: session.surface,
+    mode: session.mode,
+    conversationId: session.conversationId,
+    remote: true,
+  }));
+  sessionStore.replaceProviderSnapshot('chatgpt', list);
+  publishSessionsNow?.();
+}
+
+function chatgptExternalRequest(kind, context) {
+  const request = context?.request || {};
+  const key = JSON.stringify(['chatgpt', request.requestId]);
+  return new Promise((resolve, reject) => {
+    const record = integrationHub?.addExternalRequest({
+      provider: 'chatgpt', requestId: request.requestId, sessionId: request.sessionId,
+      kind, surface: request.surface, blocking: true, payload: request.payload, timeoutMs: request.payload?.timeoutMs,
+    }, normalized => { resolve(normalized); });
+    if (!record) reject(new Error('ChatGPT bridge is unavailable'));
+    else usageStore.recordRequest('chatgpt', request.requestId, kind, request.surface);
+    if (record && !integrationHub.pending.has(key)) reject(new Error('ChatGPT bridge request was not registered'));
+  });
+}
+
+function chatgptCancelRequest(context) {
+  const requestId = context?.request?.requestId;
+  if (requestId) void integrationHub?.respond(JSON.stringify(['chatgpt', requestId]), 'return');
+}
+
+function chatgptMcpStatus() {
+  const config = chatgptMcpSettings();
+  return {
+    enabled: config.enabled === true,
+    endpoint: config.endpoint || '',
+    transport: config.transport || 'streamable-http',
+    configured: !!chatgptMcpHttpServer,
+    authenticated: !!chatgptMcpHttpServer,
+    server: chatgptMcpHttpServer?.status({ includeToken: true }) || { running: false, endpoint: null },
+    health: chatgptMcpBridge?.health?.() || { capabilities: [], sessions: 0, pendingRequests: 0, lastCall: null },
+  };
+}
+
+async function startChatGptMcp() {
+  const config = chatgptMcpSettings();
+  if (TEST_ROOT || config.enabled !== true || chatgptMcpHttpServer) return chatgptMcpStatus();
+  if (!config.token) { config.token = randomBytes(24).toString('base64url'); saveSettings(); }
+  chatgptMcpBridge = new ChatGptMcpBridge({
+    configured: true, authenticated: true,
+    onChange: syncChatGptSessions,
+    requestApproval: context => chatgptExternalRequest('approval', context),
+    requestQuestion: context => chatgptExternalRequest('question', context),
+    cancelRequest: chatgptCancelRequest,
+    openSession: async session => ({ status: 'unsupported', reason: 'ChatGPT Chat/Work 会话没有稳定的本地深链接，请在 ChatGPT 中手动打开', sessionId: session.sessionId }),
+  });
+  chatgptMcpHttpServer = new ChatGptMcpHttpServer({ bridge: chatgptMcpBridge, token: config.token, port: Number(config.port) || 0 });
+  try {
+    const status = await chatgptMcpHttpServer.start();
+    config.endpoint = status.endpoint || '';
+    config.transport = 'streamable-http';
+    saveSettings();
+    syncChatGptSessions();
+    diag('chatgpt MCP bridge listening ' + (config.endpoint || 'unknown'));
+  } catch (error) {
+    diag('chatgpt MCP bridge failed: ' + error.message);
+    chatgptMcpHttpServer = null; chatgptMcpBridge = null;
+  }
+  publishSettings();
+  return chatgptMcpStatus();
+}
+
+async function stopChatGptMcp() {
+  await chatgptMcpHttpServer?.stop?.();
+  chatgptMcpHttpServer = null; chatgptMcpBridge = null;
+}
 
 function startCodexAppServer() {
   if (TEST_ROOT || codexAppServer || settings.codexAppServer === false) return;
@@ -830,14 +1032,15 @@ function startCodexAppServer() {
   const bridge = new CodexAppServerBridge({
     server,
     onEvent: event => {
+      event.surface = codexSurface;
       sessionStore.applyEvent(event);
-      usageStore.recordEvent(event.provider, event.payload?.event);
+      usageStore.recordEvent(event.provider, event.payload?.event, codexSurface);
       publishSessionsNow?.();
     },
     onApproval: approval => {
       const request = integrationHub?.addExternalRequest({
         provider: 'codex', requestId: approval.requestId, sessionId: approval.sessionId,
-        kind: approval.kind, blocking: true, payload: approval.payload, timeoutMs: 6 * 3600000,
+        kind: approval.kind, blocking: true, payload: { ...approval.payload, surface: codexSurface }, timeoutMs: 6 * 3600000,
       }, async normalized => {
         const decision = normalized.decision === 'allow' ? 'accept'
           : normalized.decision === 'deny' ? 'decline' : 'cancel';
@@ -853,7 +1056,7 @@ function startCodexAppServer() {
         approval.respond({ decision: 'cancel' });
         return;
       }
-      usageStore.recordRequest('codex', request.id, 'approval');
+      usageStore.recordRequest('codex', request.id, 'approval', codexSurface);
       codexAppRequestIds.add(request.id);
       const originalRespond = approval.respond;
       approval.respond = value => {
@@ -885,7 +1088,13 @@ function startCodexAppServer() {
     bridge.stop(); codexAppBridge = null; codexAppServer = null;
     return;
   }
-  server.initialize().then(() => { codexAppRestartAttempt = 0; diag('codex app-server initialized'); }).catch(error => {
+  server.initialize().then(result => {
+    codexAppRestartAttempt = 0;
+    const text = JSON.stringify(result || {}).toLowerCase();
+    codexSurface = text.includes('chatgpt') ? 'chatgpt-desktop-codex' : 'codex-desktop';
+    diag('codex app-server initialized surface=' + codexSurface);
+    publishSettings();
+  }).catch(error => {
     diag('codex app-server unavailable: ' + error.message);
     bridge.stop(); server.stop(); codexAppBridge = null; codexAppServer = null;
   });
@@ -903,7 +1112,8 @@ function stopCodexAppServer() {
 
 /* ----------------------------------------------------------------- diagnostics */
 function buildDiagnostics() {
-  const display = screen.getPrimaryDisplay();
+  const primary = screen.getPrimaryDisplay();
+  const target = targetDisplay();
   const sessions = visibleSessions();
   return JSON.stringify({
     app: 'Island HUD',
@@ -911,15 +1121,20 @@ function buildDiagnostics() {
     packaged: app.isPackaged,
     time: new Date().toISOString(),
     archivedSessions: archiveStore.list().length,
-    display: {
-      id: display.id,
-      bounds: display.bounds,
-      workArea: display.workArea,
-      scaleFactor: display.scaleFactor,
-    },
+    display: displayInfo(primary, primary),
+    primaryDisplay: displayInfo(primary, primary),
+    targetDisplay: displayInfo(target, primary),
+    targetWasFallback: targetDisplayWasFallback(),
+    allDisplays: screen.getAllDisplays().map(display => displayInfo(display, primary)),
+    overlayBounds: win && !win.isDestroyed() ? win.getBounds() : null,
+    settingsWindowBounds: settingsWin && !settingsWin.isDestroyed() ? settingsWin.getBounds() : null,
     settings: {
       updateUrl: updateUrl(),
       autoCheckUpdates: settings.autoCheckUpdates !== false,
+      displayId: settings.displayId,
+      displayFingerprint: settings.displayFingerprint || null,
+      codexSurface,
+      chatgptMcp: (() => { const value = chatgptMcpStatus(); return { enabled: value.enabled, endpoint: value.endpoint, running: value.server?.running === true, health: value.health }; })(),
     },
     sessions: sessions.map((s) => ({
       id: s.id,
@@ -944,24 +1159,36 @@ function settingsPayload() {
     codexAppServer: settings.codexAppServer !== false,
     dsh: dshIntegration.status(),
     zcode: zcodeIntegration.status(),
-    codex: codexIntegration.status(),
+    codex: { ...codexIntegration.status(), surface: codexSurface },
+    codexSurface,
+    claude: claudeIntegration.status(),
+    chatgptMcp: chatgptMcpStatus(),
+    repairHistory: readRepairHistory(),
     usage: usageStore.snapshot(),
     displays: screen.getAllDisplays().length,
     displayOptions: displayChoices(),
+    targetDisplay: displayInfo(targetDisplay()),
+    targetWasFallback: targetDisplayWasFallback(),
     autoStart: !TEST_ROOT && app.isPackaged ? loginItemState() : false,
   };
 }
 
 function openSettingsWindow() {
+  void autoRepairIntegrations('settings-open');
   if (settingsWin && !settingsWin.isDestroyed() && settingsOpen) {
+    repositionSettingsWindow();
     setIslandAlwaysOnTop(false);
     settingsWin.show();
     settingsWin.focus();
     return settingsWin;
   }
+  const display = targetDisplay();
+  const area = display.workArea;
+  const width = Math.min(760, area.width - 32);
+  const height = Math.min(680, area.height - 40);
   const windowRef = new BrowserWindow({
-    width: Math.min(760, screen.getPrimaryDisplay().workArea.width - 32),
-    height: Math.min(680, screen.getPrimaryDisplay().workArea.height - 40),
+    width,
+    height,
     minWidth: 360,
     minHeight: 420,
     resizable: true,
@@ -971,7 +1198,7 @@ function openSettingsWindow() {
     title: 'Island HUD 设置',
     backgroundColor: '#151518',
     icon: loadAppIcon(),
-    show: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -980,6 +1207,7 @@ function openSettingsWindow() {
   });
   settingsWin = windowRef;
   settingsOpen = true;
+  windowRef.setBounds(presentation.centeredBounds(area, width, height));
   setIslandAlwaysOnTop(false);
   windowRef.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   // Same lock-down as the island window (see createWindow): a local page that
@@ -988,6 +1216,7 @@ function openSettingsWindow() {
   windowRef.webContents.on('will-navigate', event => event.preventDefault());
   windowRef.once('ready-to-show', () => {
     if (settingsWin !== windowRef || windowRef.isDestroyed()) return;
+    repositionSettingsWindow();
     windowRef.show();
     windowRef.focus();
   });
@@ -1031,9 +1260,9 @@ ipcMain.handle('island:focus', async (event, id) => {
   }
   const dir = typeof session.cwd === 'string' ? session.cwd : '';
   const workspace = existingDirectory(dir);
-  if (session.provider === 'zcode') {
+  if (session.provider === 'zcode' || session.provider === 'claude') {
     const client = workspace ? zcodeClientPath() : null;
-    if (client && zcodeOpenWorkspace(client, workspace)) return { status: 'navigated', sessionId: session.rawId };
+    if (session.provider === 'zcode' && client && zcodeOpenWorkspace(client, workspace)) return { status: 'navigated', sessionId: session.rawId };
   } else {
     if (!dshNavigation) return { status: 'unsupported', sessionId: session.rawId,
       reason: 'DSH 精确导航服务不可用，请在客户端手动打开' };
@@ -1110,23 +1339,41 @@ ipcMain.handle('island:usage:reset', event => {
 ipcMain.handle('island:dsh:status', event => trustedSettings(event) ? dshIntegration.status() : null);
 ipcMain.handle('island:dsh:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('DSH 集成管理只能从设置窗口操作');
-  if (action === 'install' || action === 'repair') return dshIntegration.install();
+  if (action === 'install' || action === 'repair') { const result = dshIntegration.install(); recordRepair({ provider: 'dsh', trigger: 'manual', action, reasonCode: 'user-request', result: 'success', backupDir: result?.backupDir || '', restartRequired: result?.restartRequired === true }); return result; }
   if (action === 'remove') return dshIntegration.remove();
   throw new Error('未知的 DSH 集成操作');
 });
 ipcMain.handle('island:zcode:status', event => trustedSettings(event) ? zcodeIntegration.status() : null);
 ipcMain.handle('island:zcode:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('ZCode 集成管理只能从设置窗口操作');
-  if (action === 'install' || action === 'repair') return zcodeIntegration.install();
+  if (action === 'install' || action === 'repair') { const result = zcodeIntegration.install(); recordRepair({ provider: 'zcode', trigger: 'manual', action, reasonCode: 'user-request', result: 'success', backupDir: result?.backupDir || '', restartRequired: false }); return result; }
   if (action === 'remove') return zcodeIntegration.remove();
   throw new Error('未知的 ZCode 集成操作');
 });
 ipcMain.handle('island:codex:status', event => trustedSettings(event) ? codexIntegration.status() : null);
 ipcMain.handle('island:codex:manage', (event, action) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Codex 集成管理只能从设置窗口操作');
-  if (action === 'install' || action === 'repair') return codexIntegration.install();
+  if (action === 'install' || action === 'repair') { const result = codexIntegration.install(); recordRepair({ provider: 'codex', trigger: 'manual', action, reasonCode: 'user-request', result: 'success', backupDir: result?.backupDir || '', restartRequired: false }); return result; }
   if (action === 'remove') return codexIntegration.remove();
   throw new Error('未知的 Codex 集成操作');
+});
+ipcMain.handle('island:claude:status', event => trustedSettings(event) ? claudeIntegration.status() : null);
+ipcMain.handle('island:claude:manage', (event, action) => {
+  if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('Claude 集成管理只能从设置窗口操作');
+  if (action === 'install' || action === 'repair') { const result = claudeIntegration.install(); recordRepair({ provider: 'claude', trigger: 'manual', action, reasonCode: 'user-request', result: 'success', backupDir: result?.backupDir || '', restartRequired: false }); return result; }
+  if (action === 'remove') return claudeIntegration.remove();
+  throw new Error('未知的 Claude 集成操作');
+});
+ipcMain.handle('island:chatgpt-mcp:status', event => trustedSettings(event) ? chatgptMcpStatus() : null);
+ipcMain.handle('island:chatgpt-mcp:set', async (event, patch = {}) => {
+  if (!trustedSettings(event)) return null;
+  const config = chatgptMcpSettings();
+  if (typeof patch.enabled === 'boolean') config.enabled = patch.enabled;
+  if (typeof patch.port === 'number' && Number.isInteger(patch.port) && patch.port >= 0 && patch.port <= 65535) config.port = patch.port;
+  saveSettings();
+  if (config.enabled) await startChatGptMcp(); else await stopChatGptMcp();
+  publishSettings();
+  return chatgptMcpStatus();
 });
 ipcMain.handle('island:settings:set', (event, patch = {}) => {
   if (!settingsWin || settingsWin.isDestroyed() || event.sender !== settingsWin.webContents) throw new Error('设置只能从设置窗口保存');
@@ -1250,6 +1497,8 @@ function startHitTestPolling() {
 app.whenReady().then(() => {
   if (!SINGLE_INSTANCE) return;
   diag('single-instance lock acquired');
+  void autoRepairIntegrations('startup');
+  syncDisplayIdentity();
   createWindow();
   createTray();
   nativeTheme.on('updated', publishEnvironment);
@@ -1308,8 +1557,8 @@ app.whenReady().then(() => {
     descriptorPath: TEST_ROOT ? path.join(TEST_ROOT, 'integration-v2.json') : nativeDescriptorPath(),
     helperPath: pipeHelperPath(), log: nativeLog,
     onChange: requests => {
-      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); codexIntegration.observe(request); }
-      for (const request of requests) usageStore.recordRequest(request.provider, request.requestId || request.id, request.kind);
+      for (const request of requests) { dshIntegration.observe(request); zcodeIntegration.observe(request); codexIntegration.observe(request); claudeIntegration.observe(request); }
+      for (const request of requests) usageStore.recordRequest(request.provider, request.requestId || request.id, request.kind, request.surface || request.payload?.surface);
       sessionStore.setRequests(requests);
       if (win && !win.isDestroyed()) win.webContents.send('island:native:requests', requests);
       publishSessions();
@@ -1318,8 +1567,9 @@ app.whenReady().then(() => {
       dshIntegration.observe(request);
       zcodeIntegration.observe(request);
       codexIntegration.observe(request);
+      claudeIntegration.observe(request);
       sessionStore.applyEvent(request);
-      usageStore.recordEvent(request.provider, request.payload?.event);
+      usageStore.recordEvent(request.provider, request.payload?.event, request.surface || request.payload?.surface);
       const { event, requestId, outcome } = request.payload;
       if (requestId && ['ApprovalDecided', 'QuestionAnswered'].includes(event) && win && !win.isDestroyed()) {
         win.webContents.send('island:native:confirmation', { id: JSON.stringify([request.provider, requestId]), outcome });
@@ -1331,6 +1581,7 @@ app.whenReady().then(() => {
     },
   });
   integrationHub.start();
+  void startChatGptMcp();
   startCodexAppServer();
   // Start DSH tailing only after publishSessions exists: bridge updates route
   // through it so publishedSessions is kept in sync and duplicate IPC stops.
@@ -1379,6 +1630,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => app.quit());
 app.on('will-quit', () => {
   quitting = true;
+  void stopChatGptMcp();
   stopFullscreenWatcher();
   globalShortcut.unregisterAll();
   bridge?.stop();

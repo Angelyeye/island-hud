@@ -32,7 +32,7 @@
 
 Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成一条窄边，需要决策时展开为审批或问答卡片。允许一次、拒绝、选择答案，都不必切回终端寻找那个正在等待你的窗口。
 
-它把 **DeepSeek Harness（DSH，原生插件接入）** 与 **ZCode / Codex（hook 配置接入）** 的会话合并在同一个列表里，让各客户端的运行状态、待处理请求和完成结果，都能在同一座岛上看到。
+它把 **DeepSeek Harness（DSH）**、**ZCode / Codex / Claude Code** 与 ChatGPT Chat / Work 的显式 MCP bridge 会话合并在同一个列表里，让各客户端的运行状态、待处理请求和完成结果，都能在同一座岛上看到。
 
 > [!IMPORTANT]
 > **非官方声明**：Island HUD 是独立的社区开源项目，与 DeepSeek、ZCode 及其他任何产品、公司、团队均无关联，也未获得任何形式的背书、授权或支持。
@@ -65,8 +65,9 @@ Island HUD 是一张常驻 Windows 屏幕顶部的岛形卡片：空闲时收成
 | **DeepSeek Harness** | 本机原生插件 | 会话状态 · 权限审批 · 多题问答<br><sub>支持 timed 非阻塞</sub> | 精确定位到对应会话 |
 | **ZCode** | 写入 hook 配置 | 会话状态 · 权限审批 · 多题问答<br><sub>答案经审批面回传，实验性</sub> | 打开会话所在项目目录 |
 
-| **Codex** | hook + app-server | 会话状态 · 权限审批 · Desktop thread/turn 实时状态<br><sub>hook 需 /hooks 信任；Desktop 需开启实时桥接</sub> | 优先打开 `codex://threads/<sessionId>` |
-| ~~ChatGPT 桌面版~~ | 无官方接口 | ——<br><sub>无本地集成面，暂不支持</sub> | —— |
+| **Codex / ChatGPT Desktop Codex** | hook + app-server | 会话状态 · 权限审批 · Desktop thread/turn 实时状态<br><sub>同一套 Codex 通道；hook 需 /hooks 信任</sub> | 优先打开 `codex://threads/<sessionId>` |
+| **Claude Code** | 写入 hook 配置 | 会话状态 · 权限审批 · AskUserQuestion · 完成状态 | 打开项目目录 |
+| **ChatGPT Chat / Work** | 显式 MCP bridge | bridge 会话状态 · 审批 · 问答 · 完成通知<br><sub>只接收主动调用 Island HUD 工具的会话</sub> | 复制会话标识或回到 ChatGPT 应用 |
 
 各客户端共用同一套回环通道与同一块岛，列表按待处理优先、最近活跃在前排序；同一客户端有多个会话时，最多同时展示 50 条。
 
@@ -157,9 +158,11 @@ npm start
 
 </details>
 
-### ChatGPT 桌面版 · 不受支持
+### ChatGPT Desktop · Codex 与 Chat / Work bridge
 
-ChatGPT 桌面应用（Windows）没有任何官方本地集成接口（无 hooks、无自动化 API），第三方应用无法镜像其状态或代答审批；OpenAI 侧的可集成实体是 **Codex CLI**（上文已覆盖）。
+ChatGPT Desktop 中的 Codex 视图复用 Island HUD 现有 Codex hook + app-server 集成。Chat / Work 会话通过设置页启用本机 MCP bridge 后，由 ChatGPT 主动调用 `island_session_*`、`island_request_approval` 和 `island_request_question` 工具进入小岛；普通未调用 bridge 的 Chat / Work 对话不会被动同步。
+
+启用后，设置页会显示本机 endpoint、bearer token 和 bridge 健康状态。连接 ChatGPT 时需要工作区允许自定义 MCP，并使用支持的 HTTPS endpoint 或 Secure MCP Tunnel。Island HUD 不会自动把本机端口暴露到公网。
 
 ### 客户端审批让位（可选，默认关闭）
 
@@ -236,7 +239,7 @@ hook 由 `node` 执行：先确认 `node` 在 PATH 中，再重新发起一个 Z
 <details>
 <summary><b>支持 macOS / Linux 或其他客户端吗？</b></summary>
 
-当前只支持 Windows 10 / 11 上的 DSH、ZCode 与 Codex CLI。其他系统与客户端不在支持范围内，也没有排期承诺。
+当前只支持 Windows 10 / 11 上的 DSH、ZCode、Codex/ChatGPT Desktop Codex、Claude Code，以及主动调用 MCP bridge 的 ChatGPT Chat / Work 会话。其他系统与客户端不在支持范围内，也没有排期承诺。
 </details>
 
 ## 已知限制

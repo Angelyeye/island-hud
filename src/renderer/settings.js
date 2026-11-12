@@ -1,7 +1,7 @@
 'use strict';
 (() => {
   const $ = id => document.getElementById(id), P = window.IslandPresentation, api = window.island?.settings, sessionApi = window.island?.sessions;
-  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','notificationSound','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','codexAppServer','approvalHandoffSeconds'];
+  const fields = ['panelDensity','contentFontSize','maxPanelHeight','expandOnHover','autoCollapseOnLeave','completionReveal','completionView','completionDwellMs','motionMode','notificationSound','settingsTheme','autoHideWhenIdle','autoHideFullscreen','autoStart','dshTimedQuestions','codexAppServer','approvalHandoffSeconds','autoRepairMode'];
   const disposers = [];
   let saved = null, environment = { dark: true }, busy = false, previewReady = false;
   const status = (text, error = false) => { $('status').textContent = text; $('status').className = 'status' + (error ? ' error' : ''); };
@@ -14,20 +14,29 @@
   function values() {
     const value = {};
     for (const key of fields) { const el = $(key); value[key] = el.type === 'checkbox' ? el.checked : el.type === 'range' ? Number(el.value) : el.value; }
-    return { ...value, displayId: displayValue(), updateUrl: $('updateUrl').value.trim(), autoCheckUpdates: $('autoCheck').checked };
+    const displayId = displayValue();
+    const selected = $('displayId').selectedOptions?.[0];
+    return { ...value, displayId, displayFingerprint: displayId === null ? null : selected?.dataset.fingerprint || null,
+      updateUrl: $('updateUrl').value.trim(), autoCheckUpdates: $('autoCheck').checked };
   }
-  function renderDisplays(value, selected = $('displayId').value) {
+  function renderDisplays(value, selected = $('displayId').value, fingerprint = value.displayFingerprint || saved?.displayFingerprint) {
     const select = $('displayId'), options = Array.isArray(value.displayOptions) ? value.displayOptions : [];
     select.textContent = '';
     select.append(new Option('跟随主显示器', 'auto'));
     for (const display of options) {
       const scale = display.scaleFactor && display.scaleFactor !== 1 ? ' · ' + Math.round(display.scaleFactor * 100) + '%' : '';
       const prefix = display.index ? display.index + '. ' : '';
-      const label = `${prefix}${display.label || '显示器'} · ${display.width}×${display.height}${scale}${display.primary ? ' · 主显示器' : ''}`;
-      select.append(new Option(label, String(display.id)));
+      const bounds = display.bounds || {}, position = Number.isFinite(bounds.x) && Number.isFinite(bounds.y) ? ` · (${bounds.x}, ${bounds.y})` : '';
+      const rotation = display.rotation ? ' · 旋转 ' + display.rotation + '°' : '';
+      const label = `${prefix}${display.label || '显示器'} · ${display.width}×${display.height}${position}${scale}${rotation}${display.primary ? ' · 主显示器' : ''}`;
+      const option = new Option(label, String(display.id));
+      if (display.fingerprint) option.dataset.fingerprint = display.fingerprint;
+      select.append(option);
     }
     if (selected && selected !== 'auto' && !options.some(display => String(display.id) === selected)) {
-      select.append(new Option('已断开的显示器（临时使用主显示器）', selected));
+      const option = new Option('已断开的显示器（临时使用主显示器）', selected);
+      if (fingerprint) option.dataset.fingerprint = fingerprint;
+      select.append(option);
     }
     select.value = [...select.options].some(option => option.value === selected) ? selected : 'auto';
   }
@@ -48,8 +57,8 @@
     for (const key of fields) { const el = $(key), item = value[key] ?? P.DEFAULTS[key] ?? false; if (el.type === 'checkbox') el.checked = !!item; else el.value = item; }
     $('updateUrl').value = value.updateUrl || ''; $('autoCheck').checked = !!value.autoCheckUpdates;
     $('autoStart').disabled = !value.packaged;
-    renderDisplays(value, value.displayId == null ? 'auto' : String(value.displayId));
-    updateDsh(value.dsh); updateZcode(value.zcode); updateCodex(value.codex); renderUsage(value.usage); preview();
+    renderDisplays(value, value.displayId == null ? 'auto' : String(value.displayId), value.displayFingerprint);
+    updateDsh(value.dsh); updateZcode(value.zcode); updateCodex(value.codex); updateClaude(value.claude); updateChatGpt(value.chatgptMcp); renderUsage(value.usage); updateHealthSummary(value); preview();
   }
   function updateDsh(value) {
     if (!value) return;
@@ -70,7 +79,36 @@
     $('codexStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
     $('codexStatus').className = 'badge' + (value.connected ? ' ok' : '');
     $('codexReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
-    $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+    $('codexVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　surface：' + (value.surface || 'codex-desktop/unknown') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  function updateClaude(value) {
+    if (!value) return;
+    $('claudeStatus').textContent = value.connected ? '已连接' : value.installed ? '等待连接' : '未安装';
+    $('claudeStatus').className = 'badge' + (value.connected ? ' ok' : '');
+    $('claudeReason').textContent = (value.reason || '') + (value.conflict ? '\n注意：' + value.conflict : '');
+    $('claudeVersions').textContent = '脚本版本：' + (value.version || '未安装') + '　最近活动：' + (value.lastSeen ? new Date(value.lastSeen).toLocaleTimeString() : '尚未连接');
+  }
+  function updateChatGpt(value) {
+    if (!value) return;
+    const running = value.server?.running === true, enabled = value.enabled === true;
+    $('chatgptMcpStatus').textContent = running ? '已连接' : enabled ? '等待连接' : '未启用';
+    $('chatgptMcpStatus').className = 'badge' + (running ? ' ok' : '');
+    $('chatgptMcpEnable').checked = enabled;
+    $('chatgptMcpEndpoint').textContent = value.endpoint || value.server?.endpoint || '尚未启动本地 MCP 服务';
+    $('chatgptMcpReason').textContent = running ? 'MCP bridge 已启动；ChatGPT Chat/Work 需要主动调用 Island HUD 工具。' : enabled ? '已启用但尚未建立连接，请检查 endpoint 和 ChatGPT 工作区权限。' : '默认关闭；启用后才会启动本机 MCP bridge。';
+    $('chatgptMcpCopy').disabled = !running;
+  }
+  function updateHealthSummary(value = {}) {
+    const statuses = [value.dsh, value.zcode, value.codex, value.claude].filter(Boolean);
+    const connected = statuses.filter(item => item.connected === true).length;
+    const needsAction = statuses.filter(item => item.installed && (!item.connected || item.conflict || /修复|不完整|不匹配/.test(item.reason || ''))).length;
+    const mcp = value.chatgptMcp, mcpState = mcp?.server?.running ? 'ChatGPT MCP 已连接' : mcp?.enabled ? 'ChatGPT MCP 待连接' : 'ChatGPT MCP 未启用';
+    const repairState = value.autoRepairMode === 'manual' ? '自动修复：手动' : '自动修复：启动/打开设置时检查';
+    const lastRepair = Array.isArray(value.repairHistory) && value.repairHistory.length ? value.repairHistory[value.repairHistory.length - 1] : null;
+    const repairText = lastRepair ? ` · 最近修复：${lastRepair.provider} ${lastRepair.result}` : '';
+    $('integrationHealthStatus').textContent = needsAction ? '需要处理' : '运行正常';
+    $('integrationHealthStatus').className = 'badge' + (needsAction ? '' : ' ok');
+    $('integrationHealthSummary').textContent = `已连接 ${connected}/${statuses.length} · 需要处理 ${needsAction} · ${mcpState} · ${repairState}${repairText}`;
   }
   function renderUsage(value = {}) {
     const since = $('usageSince'), summary = $('usageSummary'); if (!since || !summary) return;
@@ -86,10 +124,11 @@
     const providerList = $('usageProviders'); if (!providerList) return;
     providerList.textContent = '';
     const logos = { dsh: 'assets/providers/dsh.svg', zcode: 'assets/providers/zcode.png', codex: 'assets/providers/codex.svg' };
-    const labels = { dsh: 'DSH', zcode: 'ZCode', codex: 'Codex' };
-    for (const provider of ['dsh', 'zcode', 'codex']) {
+    const labels = { dsh: 'DSH', zcode: 'ZCode', codex: 'Codex', claude: 'Claude', chatgpt: 'ChatGPT' };
+    for (const provider of ['dsh', 'zcode', 'codex', 'claude', 'chatgpt']) {
       const data = value.providers?.[provider] || {}, row = document.createElement('div'); row.className = 'usage-provider';
-      const logo = document.createElement('img'); logo.src = logos[provider]; logo.alt = ''; logo.className = 'usage-provider-logo';
+      const logo = document.createElement(logos[provider] ? 'img' : 'span'); logo.className = 'usage-provider-logo';
+      if (logos[provider]) { logo.src = logos[provider]; logo.alt = ''; } else { logo.textContent = provider === 'claude' ? 'A' : 'G'; logo.setAttribute('aria-hidden', 'true'); }
       const name = document.createElement('strong'); name.textContent = labels[provider];
       const counts = document.createElement('small'); counts.textContent = `事件 ${number(data.events)} · 审批 ${number(data.approvals)} · 问答 ${number(data.questions)} · 完成 ${number(data.completed)}`;
       row.append(logo, name, counts); providerList.append(row);
@@ -205,6 +244,19 @@
     } catch (error) { $('codexOutput').textContent = error.message; status('Codex 集成操作失败', true); }
     finally { busy = false; $('codexInstall').disabled = $('codexRemove').disabled = false; }
   }
+  async function manageClaude(action) {
+    if (busy) return; busy = true; $('claudeInstall').disabled = $('claudeRemove').disabled = true;
+    $('claudeOutput').textContent = action === 'remove' ? '正在卸载集成…' : '正在写入 Claude Code hook 配置…';
+    try {
+      const result = await api.claudeManage(action); updateClaude(result); $('claudeOutput').textContent = result.summary + (result.backupDir ? '\n备份：' + result.backupDir : '');
+      status(action === 'remove' ? 'Claude 集成卸载完成' : 'Claude 集成配置完成');
+    } catch (error) { $('claudeOutput').textContent = error.message; status('Claude 集成操作失败', true); }
+    finally { busy = false; $('claudeInstall').disabled = $('claudeRemove').disabled = false; }
+  }
+  async function refreshChatGpt() {
+    try { const value = await api.chatgptMcpStatus?.(); updateChatGpt(value); updateHealthSummary({ ...saved, chatgptMcp: value }); }
+    catch (error) { status('ChatGPT bridge 状态读取失败：' + error.message, true); }
+  }
   for (const button of document.querySelectorAll('[data-tab]')) button.addEventListener('click', () => {
     for (const tab of document.querySelectorAll('[data-tab]')) tab.classList.toggle('selected', tab === button);
     for (const page of document.querySelectorAll('[data-page]')) page.hidden = page.dataset.page !== button.dataset.tab;
@@ -218,6 +270,10 @@
   $('dshInstall').addEventListener('click', () => manageDsh('install')); $('dshRemove').addEventListener('click', () => manageDsh('remove'));
   $('zcodeInstall').addEventListener('click', () => manageZcode('install')); $('zcodeRemove').addEventListener('click', () => manageZcode('remove'));
   $('codexInstall').addEventListener('click', () => manageCodex('install')); $('codexRemove').addEventListener('click', () => manageCodex('remove'));
+  $('claudeInstall').addEventListener('click', () => manageClaude('install')); $('claudeRemove').addEventListener('click', () => manageClaude('remove'));
+  $('chatgptMcpEnable').addEventListener('change', async event => { try { updateChatGpt(await api.chatgptMcpSet?.({ enabled: event.target.checked })); status(event.target.checked ? 'ChatGPT MCP bridge 已启用' : 'ChatGPT MCP bridge 已关闭'); } catch (error) { event.target.checked = !event.target.checked; status('ChatGPT MCP 设置失败：' + error.message, true); } });
+  $('chatgptMcpCheck').addEventListener('click', refreshChatGpt);
+  $('chatgptMcpCopy').addEventListener('click', async () => { const value = await api.chatgptMcpStatus?.(); const server = value?.server || {}; try { await api.copy(JSON.stringify({ endpoint: server.endpoint || value.endpoint || '', token: server.token || '', transport: value.transport || 'streamable-http' }, null, 2)); status('ChatGPT MCP 连接信息已复制'); } catch (error) { status('复制连接信息失败：' + error.message, true); } });
   $('openLogs').addEventListener('click', () => api.openLogs());
   $('updateCheck').addEventListener('click', checkUpdates);
   $('updateOpen').addEventListener('click', () => api.openUpdates?.());
@@ -248,6 +304,8 @@
     api.dshStatus().then(updateDsh).catch(() => {});
     api.zcodeStatus?.().then(updateZcode).catch(() => {});
     api.codexStatus?.().then(updateCodex).catch(() => {});
+    api.claudeStatus?.().then(updateClaude).catch(() => {});
+    api.chatgptMcpStatus?.().then(value => { updateChatGpt(value); updateHealthSummary({ ...saved, chatgptMcp: value }); }).catch(() => {});
   }, 5000);
   window.addEventListener('pagehide', () => { clearInterval(timer); for (const dispose of disposers) dispose?.(); }, { once: true });
 })();

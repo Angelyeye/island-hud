@@ -34,6 +34,9 @@ class SessionStore {
     const updatedAt = envelope.at || this.now();
     if (entry.native && updatedAt < entry.native.updatedAt) return false;
     const next = { ...entry.native, updatedAt, evidence: 'native' };
+    if (envelope.surface) next.surface = envelope.surface;
+    if (envelope.remote !== undefined) next.remote = !!envelope.remote;
+    if (Array.isArray(envelope.capabilities)) next.capabilities = [...envelope.capabilities];
     if (payload.cwd) { next.cwd = payload.cwd; next.project = path.basename(payload.cwd); }
     if (event === 'SessionTitle' && typeof payload.title === 'string') next.title = payload.title;
     // Hook-based providers send the prompt inline; keep the last user text visible.

@@ -56,7 +56,7 @@ app.whenReady().then(async () => {
     checks.push('settings exposes a changelog-style update card and handles an unconfigured source');
     assert.equal(await settingsJS('!!document.querySelector("#notificationSound")'), true);
     await until(() => settingsJS('!!document.querySelector("#usageSummary .usage-metric")'));
-    await until(() => settingsJS('document.querySelectorAll("#usageProviders .usage-provider").length === 3'));
+    await until(() => settingsJS('document.querySelectorAll("#usageProviders .usage-provider").length === 5'));
     await settingsJS('document.querySelector("#usageReset").click()');
     await until(() => settingsJS('document.querySelector("#status").textContent === "使用统计已清除"'));
     checks.push('settings exposes local usage counters and can reset them without storing session content');
@@ -84,11 +84,12 @@ app.whenReady().then(async () => {
     await settingsJS(`document.querySelector("#displayId").value="${primaryId}";document.querySelector("[data-tab=display]").click();document.querySelector("#panelDensity").value="compact";document.querySelector("#settingsTheme").value="light";document.querySelector("#save").click()`);
     await until(() => js('window.__islandApp.getState().layout.width===440'));
     const savedSettings = await settingsJS('window.island.settings.get()');
-    assert.equal(savedSettings.settingsVersion, 3);
+    assert.equal(savedSettings.settingsVersion, 4);
     assert.equal(savedSettings.displayId, primaryId);
+    assert.equal(typeof savedSettings.displayFingerprint, 'string');
     assert.equal(overlay.getBounds().width, liveWidthBeforeSave);
     checks.push('display selector lists the primary display and persists the chosen display ID');
-    checks.push('saved appearance broadcasts immediately and persists version-3 settings without resizing the live island while settings is open');
+    checks.push('saved appearance broadcasts immediately and persists version-4 settings without resizing the live island while settings is open');
     fs.writeFileSync(path.join(root, 'settings-light.png'), (await settingsWindow.webContents.capturePage()).toPNG()); screenshots.push('settings-light.png');
     const before = clipboard.readText();
     await settingsJS('document.querySelector("#copyDiag").click()'); await until(() => clipboard.readText() !== before);

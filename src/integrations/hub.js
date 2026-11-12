@@ -21,10 +21,10 @@ class IntegrationHub extends BridgeServer {
   }
   snapshot() { return [...this.pending.values()].map(r => ({ ...r.request })); }
   change() { this.onChange(this.snapshot()); }
-  addExternalRequest({ provider, requestId, sessionId = null, kind = 'approval', blocking = true, payload = {}, timeoutMs } = {}, respond) {
+  addExternalRequest({ provider, requestId, sessionId = null, kind = 'approval', blocking = true, payload = {}, timeoutMs, surface } = {}, respond) {
     let request;
     try {
-      request = validateRequest({ provider, id: requestId, sessionId, kind, blocking, payload });
+      request = validateRequest({ provider, id: requestId, sessionId, kind, blocking, payload, surface });
     } catch { return null; }
     if (!this.allowedProviders.has(request.provider) || this.pending.has(request.id) || this.closed.has(request.id)) return null;
     const duration = Math.max(5_000, Math.min(24 * 3600000, Number(timeoutMs) || request.timeoutMs));

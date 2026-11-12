@@ -3,14 +3,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const presentation = require('../renderer/presentation.js');
-const DEFAULTS = { settingsVersion: 3, displayId: null, updateUrl: '', autoCheckUpdates: false, lastUpdateCheck: 0, autoHideFullscreen: false, dshTimedQuestions: false, codexAppServer: true, ...presentation.DEFAULTS };
+const DEFAULTS = { settingsVersion: 4, displayId: null, updateUrl: '', autoCheckUpdates: false, lastUpdateCheck: 0, autoHideFullscreen: false, dshTimedQuestions: false, codexAppServer: true, chatgptMcp: { enabled: false, endpoint: '', token: '', transport: 'streamable-http', port: 0 }, ...presentation.DEFAULTS };
 class SettingsStore {
-  constructor(file, { log = () => {} } = {}) { this.file = file; this.log = log; this.value = { ...DEFAULTS }; }
+  constructor(file, { log = () => {} } = {}) { this.file = file; this.log = log; this.value = { ...DEFAULTS, chatgptMcp: { ...DEFAULTS.chatgptMcp } }; }
   load() {
     try {
       const saved = JSON.parse(fs.readFileSync(this.file, 'utf8'));
       if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw new Error('Invalid settings object');
-      Object.assign(this.value, saved, { settingsVersion: 3 });
+      Object.assign(this.value, saved, { settingsVersion: 4 });
       for (const [key, value] of Object.entries(DEFAULTS)) {
         if (value !== null && typeof this.value[key] !== typeof value) this.value[key] = value;
       }

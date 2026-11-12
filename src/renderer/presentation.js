@@ -6,10 +6,10 @@
 })(typeof window === 'object' ? window : globalThis, () => {
   const DEFAULTS = Object.freeze({ panelDensity: 'comfortable', contentFontSize: 13, maxPanelHeight: 560,
     expandOnHover: true, autoCollapseOnLeave: true, completionReveal: 'glance', completionView: 'markdown-summary',
-    completionDwellMs: 5000, motionMode: 'system', settingsTheme: 'system', autoHideWhenIdle: false,
+    completionDwellMs: 5000, motionMode: 'system', notificationSound: 'off', settingsTheme: 'system', autoHideWhenIdle: false,
     approvalHandoffSeconds: 0, displayId: null });
   const choices = { panelDensity: ['comfortable', 'compact'], completionReveal: ['glance', 'expanded'],
-    completionView: ['markdown-summary', 'text-summary', 'full'], motionMode: ['system', 'reduced', 'full'],
+    completionView: ['markdown-summary', 'text-summary', 'full'], motionMode: ['system', 'reduced', 'full'], notificationSound: ['off', 'soft', 'full'],
     settingsTheme: ['system', 'dark', 'light'] };
   function normalize(input = {}) {
     const result = {};

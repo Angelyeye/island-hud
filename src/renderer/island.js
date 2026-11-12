@@ -9,7 +9,7 @@
   const policy = new P.DisplayPolicy({ settings });
   const disposers = [], contents = new Map(), rowNodes = new Map();
   let toastTimer, resultTimer, policyTimer, timeTimer, geometryFrame, geometryUntil = 0, lastBounds = '';
-  let fullReply = null, loadingReply = '', fullGeneration = 0, completionFocus = null, appVisible = true, composing = false;
+  let fullReply = null, loadingReply = '', fullGeneration = 0, completionFocus = null, appVisible = true, composing = false, audioContext = null, lastAttention = '';
   const native = window.createNativeRequests({ layers, api: preview ? { reply: async () => ({ status: 'delivered' }) } : isDemo ? null : api?.native,
     keyboard: enabled => api?.keyboard?.(enabled), askIcon: () => ({ tag: 'span', attrs: { 'aria-hidden': 'true' }, kids: ['▤'] }),
     sessionOf: request => state.sessions.find(s => s.provider === request.provider && s.rawId === request.sessionId),
@@ -267,6 +267,25 @@
     if (name === 'jump') renderCompletion();
     if (['approval','ask'].includes(name) && !native.owns(name)) renderReadOnly(name === 'ask' ? 'question' : 'approval');
   }
+  function playNotification(kind) {
+    if (preview || isDemo || settings.notificationSound === 'off') return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      audioContext ||= new AudioContext();
+      if (audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+      const tones = settings.notificationSound === 'full'
+        ? (kind === 'attention' ? [660, 880] : [880, 1175]) : [kind === 'attention' ? 660 : 880];
+      const start = audioContext.currentTime;
+      for (const [index, frequency] of tones.entries()) {
+        const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
+        const at = start + index * .09;
+        oscillator.type = 'sine'; oscillator.frequency.value = frequency;
+        gain.gain.setValueAtTime(0.0001, at); gain.gain.exponentialRampToValueAtTime(0.045, at + .012); gain.gain.exponentialRampToValueAtTime(0.0001, at + .085);
+        oscillator.connect(gain).connect(audioContext.destination); oscillator.start(at); oscillator.stop(at + .1);
+      }
+    } catch { /* Audio is optional and must never affect the renderer. */ }
+  }
   function applyScene(name, options = {}) {
     if (!layers[name]) return;
     const old = state.scene, changed = old !== name;
@@ -276,7 +295,10 @@
     notch.style.setProperty('--motion-duration', duration + 'ms');
     notch.style.setProperty('--motion-curve', options.reason === 'hover' && !layout.reduced ? 'cubic-bezier(.2,.8,.2,1.02)' : 'cubic-bezier(.2,.75,.25,1)');
     notch.className = 's-' + name;
-    notch.dataset.attention = P.attentionPhase(state.sessions, native.summary());
+    const attention = P.attentionPhase(state.sessions, native.summary());
+    if (lastAttention && attention !== lastAttention && ['waitingForApproval', 'waitingForAnswer'].includes(attention)) playNotification('attention');
+    if (lastAttention && lastAttention !== 'completed' && attention === 'completed') playNotification('completed');
+    lastAttention = attention; notch.dataset.attention = attention;
     for (const [key, layer] of Object.entries(layers)) layer.classList.toggle('active', key === name);
     if (changed) { notch.dataset.direction = name === 'compact' ? 'collapse' : 'expand'; console.log('HUD_SCENE ' + name); }
     measure();
